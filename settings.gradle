@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 pluginManagement {
     repositories {
         google()
@@ -15,4 +16,7 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "AurexScanner"
+=======
+rootProject.name='AurexScannerApp'
+>>>>>>> 63c3e15bb3f87d73d5b9897469a60d5d60663680
 include ':app'
