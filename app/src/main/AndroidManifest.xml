@@ -1,37 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <uses-permission android:name="android.permission.CAMERA"/>
-    <uses-permission android:name="android.permission.VIBRATE"/>
+    <uses-permission android:name="android.permission.INTERNET"/>
 
     <application
+        android:name=".AurexApp"
         android:allowBackup="true"
-        android:label="Aurex Scanner"
+        android:label="@string/app_name"
+        android:icon="@drawable/logo"
+        android:roundIcon="@drawable/logo"
+        android:supportsRtl="true"
         android:theme="@style/Theme.AurexScanner">
 
-        <!-- Main launcher activity -->
         <activity
-            android:name=".MainActivity"
+            android:name=".ui.MainActivity"
+            android:screenOrientation="portrait"
             android:exported="true">
-
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN"/>
-                <category android:name="android.intent.category.LAUNCHER"/>
-            </intent-filter>
-
         </activity>
 
-        <!-- Other screens -->
         <activity
-            android:name=".ScannerActivity"
-            android:exported="false"/>
+            android:name=".ui.SplashActivity"
+            android:screenOrientation="portrait"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
 
         <activity
-            android:name=".ResultActivity"
-            android:exported="false"/>
+            android:name=".ui.LoginActivity"
+            android:screenOrientation="portrait"
+            android:exported="true">
+        </activity>
+
+        <activity android:name=".ui.ScannerActivity" android:screenOrientation="portrait" />
+        <activity android:name=".ui.ProductListActivity" android:screenOrientation="portrait" />
+        <activity android:name=".ui.ResultActivity" android:screenOrientation="portrait" />
+        <activity android:name=".ui.AdminActivity" android:screenOrientation="portrait" />
+        <activity android:name=".ui.BarcodeScannerActivity" android:screenOrientation="portrait" />
+
+        <meta-data
+            android:name="com.google.android.gms.ads.APPLICATION_ID"
+            android:value="ca-app-pub-6256902093143787~1997142405"/>
 
         <activity
-            android:name=".ProductListActivity"
-            android:exported="false"/>
+            android:name=".ui.SettingsActivity"
+            android:label="@string/settings"
+            android:parentActivityName=".ui.MainActivity" />
 
     </application>
 

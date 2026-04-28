@@ -13,29 +13,46 @@
         android:layout_height="match_parent" />
 
     <LinearLayout
-        android:layout_width="wrap_content"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_gravity="bottom|center"
-        android:layout_marginBottom="24dp"
+        android:layout_gravity="bottom"
+        android:paddingBottom="40dp"
+        android:paddingTop="20dp"
+        android:background="#44000000"
+        android:gravity="center"
         android:orientation="horizontal">
 
         <ImageButton
             android:id="@+id/btnFlash"
-            android:layout_width="56dp"
-            android:layout_height="56dp"
-            android:layout_marginEnd="16dp"
-            android:background="@android:color/transparent"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_marginEnd="20dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
             android:contentDescription="Toggle Flash"
-            android:src="@android:drawable/ic_menu_camera" />
+            android:src="@drawable/ic_flash_off"
+            android:tint="@android:color/white" />
 
         <ImageButton
             android:id="@+id/btnCapture"
-            android:layout_width="72dp"
-            android:layout_height="72dp"
-            android:background="@android:color/transparent"
+            android:layout_width="80dp"
+            android:layout_height="80dp"
+            android:background="@drawable/ic_capture_btn"
             android:contentDescription="Capture Image"
-            android:scaleType="fitCenter"
-            android:src="@android:drawable/ic_menu_save" />
+            android:elevation="8dp"
+            android:scaleType="centerInside"
+            android:padding="20dp"
+            android:src="@android:drawable/ic_menu_camera"
+            android:tint="#333333" />
+
+        <ImageButton
+            android:id="@+id/btnHistory"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_marginStart="20dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="View History"
+            android:src="@android:drawable/ic_menu_recent_history"
+            android:tint="@android:color/white" />
 
     </LinearLayout>
 </FrameLayout>

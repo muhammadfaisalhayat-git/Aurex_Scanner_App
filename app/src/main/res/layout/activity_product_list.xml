@@ -4,14 +4,67 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
+    <LinearLayout
+        android:id="@+id/sortContainer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="8dp"
+        android:background="#F5F5F5"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/filter_by"
+            android:textStyle="bold"
+            android:layout_gravity="center_vertical"
+            android:paddingEnd="8dp"/>
+
+        <HorizontalScrollView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:scrollbars="none">
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/chipCategory"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/category_filter"
+                    android:layout_marginEnd="4dp"
+                    app:chipIcon="@android:drawable/ic_menu_agenda"/>
+
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/chipWarehouse"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/warehouse_filter"
+                    android:layout_marginEnd="4dp"
+                    app:chipIcon="@android:drawable/ic_menu_myplaces"/>
+
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/chipExpiry"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/expiry"
+                    app:chipIcon="@android:drawable/ic_lock_idle_alarm"/>
+            </LinearLayout>
+        </HorizontalScrollView>
+    </LinearLayout>
+
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/recyclerView"
         android:layout_width="0dp"
         android:layout_height="0dp"
-        app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
+        app:layout_constraintTop_toBottomOf="@id/sortContainer" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

@@ -1,0 +1,32 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="200dp"
+    android:height="200dp"
+    android:viewportWidth="100"
+    android:viewportHeight="100">
+    <!-- Circle hands -->
+    <path
+        android:fillColor="#689F38"
+        android:pathData="M50,15 C35,15 20,25 15,50 C15,65 25,80 50,85 C55,85 58,83 60,82 L58,78 C55,80 52,81 50,81 C30,81 20,65 20,50 C20,30 35,20 50,20 C52,20 55,21 58,22 L60,18 C58,17 55,15 50,15 Z" />
+    <path
+        android:fillColor="#689F38"
+        android:pathData="M50,15 C65,15 80,25 85,50 C85,65 75,80 50,85 C45,85 42,83 40,82 L42,78 C45,80 48,81 50,81 C70,81 80,65 80,50 C80,30 65,20 50,20 C48,20 45,21 42,22 L40,18 C42,17 45,15 50,15 Z" />
+
+    <!-- Central Plant -->
+    <path
+        android:fillColor="#689F38"
+        android:pathData="M50,70 L50,40"
+        android:strokeColor="#689F38"
+        android:strokeWidth="1.5"/>
+    <!-- Top Leaf -->
+    <path
+        android:fillColor="#689F38"
+        android:pathData="M50,30 C53,35 53,40 50,45 C47,40 47,35 50,30 Z" />
+    <!-- Left Leaf -->
+    <path
+        android:fillColor="#689F38"
+        android:pathData="M50,45 C43,45 38,48 38,52 C43,55 48,52 50,45 Z" />
+    <!-- Right Leaf -->
+    <path
+        android:fillColor="#689F38"
+        android:pathData="M50,45 C57,45 62,48 62,52 C57,55 52,52 50,45 Z" />
+</vector>

@@ -1,42 +1,109 @@
 <?xml version="1.0" encoding="utf-8"?>
 <com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/cardProduct"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginHorizontal="16dp"
-    android:layout_marginVertical="8dp"
-    app:cardCornerRadius="12dp"
-    app:cardElevation="2dp">
+    android:layout_marginHorizontal="12dp"
+    android:layout_marginVertical="6dp"
+    app:cardCornerRadius="16dp"
+    app:cardElevation="0dp"
+    app:strokeWidth="1dp"
+    app:strokeColor="#E0E0E0"
+    app:cardBackgroundColor="#CCFFFFFF">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="16dp">
+        android:orientation="horizontal"
+        android:padding="12dp"
+        android:gravity="center_vertical">
 
-        <TextView
-            android:id="@+id/name"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Product Name"
-            android:textAppearance="?attr/textAppearanceTitleMedium" />
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="80dp"
+            android:layout_height="80dp"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="0dp">
+            <ImageView
+                android:id="@+id/imgProduct"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="centerCrop"
+                android:src="@android:drawable/ic_menu_report_image" />
+        </com.google.android.material.card.MaterialCardView>
 
-        <TextView
-            android:id="@+id/expiry"
-            android:layout_width="match_parent"
+        <LinearLayout
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:text="EXP: 12/12/2024"
-            android:textAppearance="?attr/textAppearanceBodyMedium"
-            android:textColor="#FF0000" />
+            android:layout_weight="1"
+            android:layout_marginStart="12dp"
+            android:orientation="vertical">
 
-        <TextView
-            android:id="@+id/barcode"
-            android:layout_width="match_parent"
+            <TextView
+                android:id="@+id/name"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Product Name"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:textColor="@color/black" />
+
+            <TextView
+                android:id="@+id/expiry"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="EXP: 12/12/2024"
+                android:textSize="13sp"
+                android:textColor="#757575" />
+
+            <TextView
+                android:id="@+id/remaining_days"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:background="@android:color/transparent"
+                android:text="Expires in 10 days"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:textColor="#E53935"
+                android:visibility="visible" />
+
+            <TextView
+                android:id="@+id/quantity"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="Qty: 1 | Warehouse: A"
+                android:textSize="12sp"
+                android:textColor="#9E9E9E" />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
-            android:text="Barcode: N/A"
-            android:textAppearance="?attr/textAppearanceBodySmall" />
+            android:orientation="vertical"
+            android:gravity="center">
+
+            <ImageView
+                android:id="@+id/imgSynced"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:src="@drawable/ic_check_circle"
+                app:tint="#4CAF50"
+                android:visibility="gone" />
+
+            <ImageButton
+                android:id="@+id/btnEditProduct"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_marginTop="4dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:src="@android:drawable/ic_menu_edit"
+                app:tint="@color/primary"
+                android:visibility="gone" />
+        </LinearLayout>
 
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>

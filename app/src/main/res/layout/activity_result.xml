@@ -1,46 +1,302 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:gravity="center"
-    android:orientation="vertical"
-    android:padding="16dp">
+    android:fillViewport="true"
+    android:background="#FFFFFF">
 
-    <TextView
-        android:id="@+id/txtResult"
+    <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:text="Raw Text"
-        android:scrollbars="vertical"
-        android:textSize="14sp" />
-
-    <TextView
-        android:id="@+id/txtExpiry"
-        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:text="Expiry Date: "
-        android:textColor="#FF0000"
-        android:textSize="18sp"
-        android:textStyle="bold" />
+        android:orientation="vertical">
 
-    <TextView
-        android:id="@+id/txtMfg"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:text="Mfg Date: "
-        android:textColor="#008000"
-        android:textSize="18sp"
-        android:textStyle="bold" />
+        <!-- View Mode: Stretched Image + Profile Info -->
+        <LinearLayout
+            android:id="@+id/layoutViewMode"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="visible">
 
-    <Button
-        android:id="@+id/btnBack"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="32dp"
-        android:text="Scan Again"
-        android:onClick="onBackClick"/>
+            <!-- Stretched Product Image -->
+            <ImageView
+                android:id="@+id/imgProductPreview"
+                android:layout_width="match_parent"
+                android:layout_height="320dp"
+                android:scaleType="centerCrop"
+                android:background="#F5F5F5" />
 
-</LinearLayout>
+            <!-- Green Header Section (Directly under Image) -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="#5E7D6A"
+                android:padding="24dp"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/txtNameView"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Product Name"
+                    android:textColor="#FFFFFF"
+                    android:textSize="28sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/txtProductCodeView"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Code: 53525434"
+                    android:textColor="#E0E0E0"
+                    android:textSize="18sp"
+                    android:layout_marginTop="2dp" />
+
+                <View
+                    android:layout_width="240dp"
+                    android:layout_height="1dp"
+                    android:background="#80FFFFFF"
+                    android:layout_marginTop="16dp"
+                    android:layout_marginBottom="16dp" />
+
+                <TextView
+                    android:id="@+id/txtMfgDisplayView"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="MFG: 07/2024"
+                    android:textColor="#FFFFFF"
+                    android:textSize="15sp" />
+
+                <TextView
+                    android:id="@+id/txtExpDisplayView"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="EXP: 07/2026"
+                    android:textColor="#FFFFFF"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:layout_marginTop="6dp" />
+
+            </LinearLayout>
+
+            <!-- White Details Section -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="24dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/product_details"
+                    android:textColor="#5E7D6A"
+                    android:textSize="20sp"
+                    android:textStyle="bold"
+                    android:layout_marginBottom="24dp" />
+
+                <TableLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:stretchColumns="1">
+
+                    <TableRow android:layout_marginBottom="18dp">
+                        <TextView
+                            android:layout_width="130dp"
+                            android:text="@string/category_label"
+                            android:textStyle="bold"
+                            android:textColor="#333"
+                            android:textSize="16sp" />
+                        <TextView
+                            android:id="@+id/txtCategoryView"
+                            android:text="General"
+                            android:textColor="#666"
+                            android:textSize="16sp" />
+                    </TableRow>
+
+                    <TableRow android:layout_marginBottom="18dp">
+                        <TextView
+                            android:text="@string/warehouse_label"
+                            android:textStyle="bold"
+                            android:textColor="#333"
+                            android:textSize="16sp" />
+                        <TextView
+                            android:id="@+id/txtWarehouseView"
+                            android:text="Main Warehouse"
+                            android:textColor="#666"
+                            android:textSize="16sp" />
+                    </TableRow>
+
+                    <TableRow android:layout_marginBottom="18dp">
+                        <TextView
+                            android:text="@string/quantity_label"
+                            android:textStyle="bold"
+                            android:textColor="#333"
+                            android:textSize="16sp" />
+                        <TextView
+                            android:id="@+id/txtQuantityView"
+                            android:text="1"
+                            android:textColor="#666"
+                            android:textSize="16sp" />
+                    </TableRow>
+
+                    <TableRow android:layout_marginBottom="18dp">
+                        <TextView
+                            android:text="@string/size_label"
+                            android:textStyle="bold"
+                            android:textColor="#333"
+                            android:textSize="16sp" />
+                        <TextView
+                            android:id="@+id/txtSizeView"
+                            android:text="N/A"
+                            android:textColor="#666"
+                            android:textSize="16sp" />
+                    </TableRow>
+                </TableLayout>
+
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- Edit Mode (Standard Form) -->
+        <LinearLayout
+            android:id="@+id/layoutEditMode"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="20dp"
+            android:visibility="gone">
+
+            <!-- Captured Image Preview (Small) -->
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="180dp"
+                android:layout_marginBottom="16dp">
+
+                <ImageView
+                    android:id="@+id/imgEditPreview"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:scaleType="centerCrop"
+                    android:background="#F0F0F0" />
+            </FrameLayout>
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/tilProductCode"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:endIconMode="custom"
+                app:endIconDrawable="@drawable/ic_scan"
+                app:endIconTint="#5E7D6A"
+                app:endIconContentDescription="@string/scan_product"
+                android:hint="@string/product_code">
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/editProductCode"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:hint="@string/product_name">
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/editName"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <TextView
+                android:id="@+id/txtMfgDisplay"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="MFG: Not found" />
+
+            <TextView
+                android:id="@+id/txtExpDisplay"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:textColor="#D32F2F"
+                android:textStyle="bold"
+                android:text="EXP: Not found" />
+
+            <com.google.android.material.textfield.TextInputLayout
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:hint="@string/category"
+                app:endIconMode="dropdown_menu">
+                <AutoCompleteTextView
+                    android:id="@+id/editCategory"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="text" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:hint="@string/warehouse">
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/editWarehouse"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:hint="@string/quantity">
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/editQuantity"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="number" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:hint="@string/size_weight">
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/editSize"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+        </LinearLayout>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:minHeight="40dp" />
+
+        <Button
+            android:id="@+id/btnSave"
+            android:layout_width="match_parent"
+            android:layout_height="60dp"
+            android:layout_marginLeft="24dp"
+            android:layout_marginRight="24dp"
+            android:text="@string/update_product"
+            android:backgroundTint="#5E7D6A"
+            android:visibility="gone" />
+
+        <Button
+            android:id="@+id/btnRescan"
+            style="@style/Widget.MaterialComponents.Button.TextButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="24dp"
+            android:textColor="#5E7D6A"
+            android:text="@string/edit" />
+
+    </LinearLayout>
+</ScrollView>

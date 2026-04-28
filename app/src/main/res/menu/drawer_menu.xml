@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <group android:checkableBehavior="single">
+        <item
+            android:id="@+id/nav_scan"
+            android:icon="@android:drawable/ic_menu_camera"
+            android:title="@string/scan_product" />
+        <item
+            android:id="@+id/nav_history"
+            android:icon="@android:drawable/ic_menu_recent_history"
+            android:title="@string/scan_history" />
+        <item
+            android:id="@+id/nav_admin"
+            android:icon="@android:drawable/ic_lock_lock"
+            android:title="@string/admin_dashboard"
+            android:visible="false" />
+        <item
+            android:id="@+id/nav_backup"
+            android:icon="@android:drawable/ic_menu_save"
+            android:title="@string/backup_to_firebase" />
+        <item
+            android:id="@+id/nav_restore"
+            android:icon="@android:drawable/stat_sys_download"
+            android:title="@string/restore_from_server" />
+        <item
+            android:id="@+id/nav_language"
+            android:icon="@android:drawable/ic_menu_manage"
+            android:title="@string/switch_language" />
+        <item
+            android:id="@+id/nav_settings"
+            android:icon="@android:drawable/ic_menu_preferences"
+            android:title="@string/settings" />
+    </group>
+    <item android:title="@string/account">
+        <menu>
+            <item
+                android:id="@+id/nav_logout"
+                android:icon="@android:drawable/ic_lock_power_off"
+                android:title="@string/sign_out" />
+        </menu>
+    </item>
+</menu>

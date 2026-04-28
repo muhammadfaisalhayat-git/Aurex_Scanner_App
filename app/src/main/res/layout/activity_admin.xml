@@ -1,0 +1,313 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical">
+
+    <com.google.android.material.appbar.MaterialToolbar
+        android:id="@+id/toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize"
+        android:background="?attr/colorPrimary"
+        app:title="@string/admin_dashboard"
+        app:titleTextColor="@android:color/white" />
+
+    <com.google.android.material.tabs.TabLayout
+        android:id="@+id/adminTabs"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+        <com.google.android.material.tabs.TabItem
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/manage_products" />
+        <com.google.android.material.tabs.TabItem
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/manage_users" />
+    </com.google.android.material.tabs.TabLayout>
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <!-- Products Section -->
+        <LinearLayout
+            android:id="@+id/layoutProducts"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:visibility="visible">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:padding="8dp">
+
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/cardTotalItems"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_margin="4dp"
+                    app:cardElevation="4dp"
+                    app:cardCornerRadius="12dp"
+                    app:cardBackgroundColor="@color/primary"
+                    android:clickable="true"
+                    android:focusable="true">
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="16dp"
+                        android:gravity="center">
+                        <TextView
+                            android:id="@+id/txtTotalProducts"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="0"
+                            android:textColor="@android:color/white"
+                            android:textSize="28sp"
+                            android:textStyle="bold" />
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/total_items"
+                            android:textColor="@android:color/white"
+                            android:textSize="12sp"
+                            android:textAllCaps="true"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/cardExpiredItems"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_margin="4dp"
+                    app:cardElevation="4dp"
+                    app:cardCornerRadius="12dp"
+                    app:cardBackgroundColor="#E53935"
+                    android:clickable="true"
+                    android:focusable="true">
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="16dp"
+                        android:gravity="center">
+                        <TextView
+                            android:id="@+id/txtExpiredCount"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="0"
+                            android:textColor="@android:color/white"
+                            android:textSize="28sp"
+                            android:textStyle="bold" />
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/expired"
+                            android:textColor="@android:color/white"
+                            android:textSize="12sp"
+                            android:textAllCaps="true"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/cardNearExpiryItems"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_margin="4dp"
+                    app:cardElevation="4dp"
+                    app:cardCornerRadius="12dp"
+                    app:cardBackgroundColor="#FF9800"
+                    android:clickable="true"
+                    android:focusable="true">
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="16dp"
+                        android:gravity="center">
+                        <TextView
+                            android:id="@+id/txtNearExpiryCount"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="0"
+                            android:textColor="@android:color/white"
+                            android:textSize="28sp"
+                            android:textStyle="bold" />
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/near_expiry"
+                            android:textColor="@android:color/white"
+                            android:textSize="12sp"
+                            android:textAllCaps="true"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+            </LinearLayout>
+
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardAdvancedAnalytics"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_margin="8dp"
+                app:cardCornerRadius="20dp"
+                app:cardElevation="8dp"
+                app:cardBackgroundColor="#E6FFFFFF"
+                android:clickable="true"
+                android:focusable="true">
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <RelativeLayout
+                        android:id="@+id/layoutAnalyticsHeader"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content">
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Premium Insights"
+                            android:textStyle="bold"
+                            android:textSize="20sp"
+                            android:textColor="#1B5E20"/>
+                        <ImageView
+                            android:id="@+id/imgExpandAnalytics"
+                            android:layout_width="28dp"
+                            android:layout_height="28dp"
+                            android:layout_alignParentEnd="true"
+                            android:src="@android:drawable/arrow_down_float"
+                            app:tint="#1B5E20"/>
+                    </RelativeLayout>
+
+                    <LinearLayout
+                        android:id="@+id/layoutAnalyticsContent"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:visibility="gone"
+                        android:layout_marginTop="20dp">
+
+                        <!-- Row 1: Donut & Pie -->
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:weightSum="2">
+
+                            <LinearLayout
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:orientation="vertical"
+                                android:gravity="center">
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="STOCKS HEALTH"
+                                    android:textSize="10sp"
+                                    android:textColor="#777"
+                                    android:layout_marginBottom="8dp"/>
+                                <FrameLayout
+                                    android:id="@+id/chartDonutStatus"
+                                    android:layout_width="140dp"
+                                    android:layout_height="140dp"
+                                    android:background="@drawable/glass_circle_bg"/>
+                            </LinearLayout>
+
+                            <LinearLayout
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:orientation="vertical"
+                                android:gravity="center">
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="CATEGORY SPLIT"
+                                    android:textSize="10sp"
+                                    android:textColor="#777"
+                                    android:layout_marginBottom="8dp"/>
+                                <FrameLayout
+                                    android:id="@+id/chartPieCategory"
+                                    android:layout_width="140dp"
+                                    android:layout_height="140dp"
+                                    android:background="@drawable/glass_circle_bg"/>
+                            </LinearLayout>
+                        </LinearLayout>
+
+                        <!-- Row 2: Warehouse Circle -->
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="vertical"
+                            android:gravity="center"
+                            android:layout_marginTop="24dp">
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="WAREHOUSE DISTRIBUTION"
+                                android:textSize="10sp"
+                                android:textColor="#777"
+                                android:layout_marginBottom="8dp"/>
+                            <FrameLayout
+                                android:id="@+id/chartCircleWarehouse"
+                                android:layout_width="160dp"
+                                android:layout_height="160dp"
+                                android:background="@drawable/glass_circle_bg"/>
+                        </LinearLayout>
+
+                    </LinearLayout>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+                android:id="@+id/swipeRefreshProducts"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent">
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/rvAdminProducts"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:padding="8dp" />
+            </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+        </LinearLayout>
+
+        <!-- Users Section -->
+        <LinearLayout
+            android:id="@+id/layoutUsers"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnAddUser"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="end"
+                android:layout_margin="16dp"
+                android:text="@string/add_user"
+                app:icon="@android:drawable/ic_menu_add" />
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/rvAdminUsers"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:padding="8dp" />
+        </LinearLayout>
+
+    </FrameLayout>
+
+</LinearLayout>

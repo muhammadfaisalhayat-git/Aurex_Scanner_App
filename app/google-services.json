@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "926048009789",
+    "project_id": "aurexscannerapp",
+    "firebase_url": "https://aurexscannerapp-default-rtdb.firebaseio.com",
+    "storage_bucket": "aurexscannerapp.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:926048009789:android:6fd963b5fee8f12e40b454",
+        "android_client_info": {
+          "package_name": "com.aurex.scanner"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "926048009789-sj1eic9280u9gd3ua4uis2uigu48l8na.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.aurex.scanner",
+            "certificate_hash": "7ead8066e29b85ffd9aebfc02b821813a9073f30"
+          }
+        },
+        {
+          "client_id": "926048009789-sir5l1akq1ihibf902ldr2aghqdnb5rm.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBQ7fqAPnoekD7zibmorerOXJsGSFZB_x0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "926048009789-sir5l1akq1ihibf902ldr2aghqdnb5rm.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
