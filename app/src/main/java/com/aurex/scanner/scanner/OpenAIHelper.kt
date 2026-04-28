@@ -76,6 +76,9 @@ object OpenAIHelper {
                         val content = completionResponse.choices.firstOrNull()?.message?.content ?: ""
                         Log.d("OpenAIHelper", "Content: $content")
                         val product = gson.fromJson(content, Product::class.java)
+                        if (product != null) {
+                            product.productCode = TextParser.cleanProductCode(product.productCode)
+                        }
                         callback(product)
                     } catch (e: Exception) {
                         Log.e("OpenAIHelper", "Parsing error", e)

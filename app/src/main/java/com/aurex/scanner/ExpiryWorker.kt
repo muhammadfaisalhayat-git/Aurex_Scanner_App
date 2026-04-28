@@ -13,6 +13,7 @@ import androidx.work.WorkerParameters
 import com.aurex.scanner.data.AppDatabase
 import com.aurex.scanner.data.Notification
 import com.aurex.scanner.util.NotificationHelper
+import com.aurex.scanner.scanner.TextParser
 import com.google.firebase.auth.FirebaseAuth
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -31,17 +32,23 @@ class ExpiryWorker(
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val today = LocalDate.now()
-            val formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy")
-            // 45, 30, 15, 10, 5, 3, 1 days before expiration
-            val alertDays = listOf(45L, 30L, 15L, 10L, 5L, 3L, 1L, 0L)
-
+            
             for (product in products) {
                 try {
                     val expiryStr = product.expDate ?: continue
-                    val expiry = LocalDate.parse(expiryStr, formatter)
+                    
+                    // Use TextParser to handle various formats (dd/MM/yyyy, MM/yyyy, etc)
+                    val sortableDate = TextParser.convertToSortable(expiryStr)
+                    val expiry = LocalDate.parse(sortableDate, DateTimeFormatter.ofPattern("yyyyMMdd"))
                     val daysLeft = ChronoUnit.DAYS.between(today, expiry)
 
-                    if (daysLeft in alertDays || daysLeft < 0) {
+                    // Milestone days for early warnings
+                    val milestoneDays = listOf(45L, 30L, 20L)
+                    
+                    // Logic: Notify on milestones OR every day if within 15 days OR if already expired
+                    val shouldNotify = daysLeft in milestoneDays || daysLeft <= 15
+
+                    if (shouldNotify) {
                         val message = when {
                             daysLeft < 0 -> "EXPIRED! (${Math.abs(daysLeft)} days ago)"
                             daysLeft == 0L -> "Expires TODAY!"

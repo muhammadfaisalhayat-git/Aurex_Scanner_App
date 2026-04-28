@@ -197,9 +197,13 @@
             </com.google.android.material.textfield.TextInputLayout>
 
             <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/tilProductName"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="12dp"
+                app:endIconMode="custom"
+                app:endIconDrawable="@drawable/ic_scan"
+                app:endIconTint="#5E7D6A"
                 android:hint="@string/product_name">
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/editName"

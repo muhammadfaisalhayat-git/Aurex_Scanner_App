@@ -18,6 +18,8 @@ import com.aurex.scanner.scanner.TextParser
 import com.google.android.material.tabs.TabLayout
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.*
+import com.google.firebase.firestore.FirebaseFirestore
+import com.aurex.scanner.util.FirebaseUtils
 import com.aurex.scanner.util.NotificationHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -325,17 +327,56 @@ class AdminActivity : BaseActivity() {
     private fun loadDashboardData() {
         val db = AppDatabase.getDatabase(this)
         lifecycleScope.launch(Dispatchers.IO) {
+            // Load local data first for immediate display
             allAdminProducts = db.productDao().getAllList()
-            val expiredCount = allAdminProducts.count { TextParser.isExpired(it.expDate) }
-            val nearExpiryCount = allAdminProducts.count { TextParser.isNearExpiry(it.expDate) }
-            
-            withContext(Dispatchers.Main) {
-                txtTotal.text = allAdminProducts.size.toString()
-                txtExpired.text = expiredCount.toString()
-                txtNearExpiry.text = nearExpiryCount.toString()
-                updateFilteredList()
-                updatePremiumCharts()
+            updateDashboardUI()
+
+            // Fetch remote data from unified Firestore 'products' collections
+            val firestore = FirebaseUtils.getFirestore()
+            firestore.collectionGroup("products").get().addOnSuccessListener { snapshot ->
+                lifecycleScope.launch(Dispatchers.Default) {
+                    val remoteProducts = mutableListOf<Product>()
+                    for (doc in snapshot.documents) {
+                        try {
+                            val product = doc.toObject(Product::class.java)
+                            if (product != null) {
+                                if (product.productCode.isEmpty()) product.productCode = doc.id
+                                product.isSynced = true
+                                remoteProducts.add(product)
+                            }
+                        } catch (e: Exception) {
+                            android.util.Log.e("AdminActivity", "Error parsing product", e)
+                        }
+                    }
+                    
+                    if (remoteProducts.isNotEmpty()) {
+                        allAdminProducts = remoteProducts
+                        withContext(Dispatchers.Main) {
+                            updateDashboardUI()
+                            swipeRefresh.isRefreshing = false
+                        }
+                    } else {
+                        withContext(Dispatchers.Main) {
+                            swipeRefresh.isRefreshing = false
+                        }
+                    }
+                }
+            }.addOnFailureListener {
+                swipeRefresh.isRefreshing = false
             }
+        }
+    }
+
+    private suspend fun updateDashboardUI() {
+        val expiredCount = allAdminProducts.count { TextParser.isExpired(it.expDate) }
+        val nearExpiryCount = allAdminProducts.count { TextParser.isNearExpiry(it.expDate) }
+        
+        withContext(Dispatchers.Main) {
+            txtTotal.text = allAdminProducts.size.toString()
+            txtExpired.text = expiredCount.toString()
+            txtNearExpiry.text = nearExpiryCount.toString()
+            updateFilteredList()
+            updatePremiumCharts()
         }
     }
 
@@ -376,7 +417,8 @@ class AdminActivity : BaseActivity() {
         })
 
         // 2. Category Pie (Measure: Product count per category)
-        val catGroups = allAdminProducts.groupBy { it.category ?: getString(R.string.general) }
+        val catMap = allAdminProducts.groupBy { it.category ?: getString(R.string.general) }
+        val catGroups = if (catMap.isEmpty() && allAdminProducts.isNotEmpty()) mapOf(getString(R.string.general) to emptyList<Product>()) else catMap
         val catColors = listOf("#7C4DFF", "#448AFF", "#00BCD4", "#00E676", "#FFEB3B", "#FF5252")
         val catData = catGroups.entries.sortedByDescending { it.value.size }.take(5).mapIndexed { index, entry ->
             ChartSlice(entry.key, entry.value.size.toFloat(), Color.parseColor(catColors[index % catColors.size]), entry.key)

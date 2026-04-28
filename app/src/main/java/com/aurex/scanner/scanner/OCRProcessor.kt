@@ -58,13 +58,13 @@ object OCRProcessor {
                         Log.d("OCRProcessor", "OpenAI success: $openAIProduct")
                         callback(openAIProduct)
                     } else {
-                        Log.d("OCRProcessor", "OpenAI failed or no dates, trying ML Kit Arabic...")
+                        Log.d("OCRProcessor", "OpenAI failed or no dates, trying ML Kit...")
                         processWithMLKit(image, bitmap, callback)
                     }
                 }
             }
         } else {
-            Log.d("OCRProcessor", "No bitmap, falling back to ML Kit Arabic...")
+            Log.d("OCRProcessor", "No bitmap, falling back to ML Kit...")
             processWithMLKit(image, null, callback)
         }
     }

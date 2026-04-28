@@ -123,6 +123,13 @@ class ResultActivity : BaseActivity() {
             startActivityForResult(intent, 1001)
         }
 
+        findViewById<com.google.android.material.textfield.TextInputLayout>(R.id.tilProductName).setEndIconOnClickListener {
+            val intent = Intent(this, ScannerActivity::class.java)
+            intent.putExtra("SINGLE_SCAN_MODE", true)
+            intent.putExtra("SCAN_TARGET", "NAME")
+            startActivityForResult(intent, 1002)
+        }
+
         setupCategoryDropdown(editCategory)
 
         product.imagePath?.let { path ->
@@ -181,11 +188,19 @@ class ResultActivity : BaseActivity() {
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == 1001 && resultCode == RESULT_OK) {
-            val scannedCode = data?.getStringExtra("SCAN_RESULT")
-            if (scannedCode != null) {
-                findViewById<EditText>(R.id.editProductCode).setText(scannedCode)
-                Toast.makeText(this, "Barcode Scanned: $scannedCode", Toast.LENGTH_SHORT).show()
+        if (resultCode == RESULT_OK) {
+            val scannedResult = data?.getStringExtra("SCAN_RESULT")
+            if (scannedResult != null) {
+                when (requestCode) {
+                    1001 -> {
+                        findViewById<EditText>(R.id.editProductCode).setText(scannedResult)
+                        Toast.makeText(this, "Barcode Scanned: $scannedResult", Toast.LENGTH_SHORT).show()
+                    }
+                    1002 -> {
+                        findViewById<EditText>(R.id.editName).setText(scannedResult)
+                        Toast.makeText(this, "Product Name Scanned: $scannedResult", Toast.LENGTH_SHORT).show()
+                    }
+                }
             }
         }
     }

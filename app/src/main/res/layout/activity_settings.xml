@@ -1,210 +1,202 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:padding="16dp">
-
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/theme"
-        android:textSize="18sp"
-        android:textStyle="bold"
-        android:layout_marginBottom="8dp"
-        android:textColor="?attr/colorOnSurface"/>
-
-    <RadioGroup
-        android:id="@+id/rgTheme"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content">
-
-        <RadioButton
-            android:id="@+id/rbSystem"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/system_default"
-            android:padding="12dp"/>
-
-        <RadioButton
-            android:id="@+id/rbLight"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/light_mode"
-            android:padding="12dp"/>
-
-        <RadioButton
-            android:id="@+id/rbDark"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/dark_mode"
-            android:padding="12dp"/>
-    </RadioGroup>
-
-    <View
-        android:layout_width="match_parent"
-        android:layout_height="1dp"
-        android:background="?android:attr/listDivider"
-        android:layout_marginVertical="16dp"/>
+    android:fillViewport="true"
+    android:background="?attr/colorSurface">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical">
+        android:orientation="vertical"
+        android:padding="16dp">
 
-        <LinearLayout
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:orientation="vertical">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/enable_biometric"
-                android:textSize="16sp"
-                android:textStyle="bold"
-                android:textColor="?attr/colorOnSurface"/>
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/biometric_desc"
-                android:textSize="12sp"
-                android:textColor="?attr/colorOnSurface"
-                android:alpha="0.7"/>
-            <com.google.android.material.button.MaterialButton
-        android:id="@+id/btnCleanFirestore"
-        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-        android:layout_width="match_parent"
-        android:layout_height="64dp"
-        android:text="Clean Cloud Backups"
-        android:layout_marginTop="8dp"
-        app:icon="@android:drawable/ic_menu_delete" />
-
-</LinearLayout>
-
-        <androidx.appcompat.widget.SwitchCompat
-            android:id="@+id/swBiometric"
+        <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:checked="true"/>
-        <com.google.android.material.button.MaterialButton
-        android:id="@+id/btnCleanFirestore"
-        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-        android:layout_width="match_parent"
-        android:layout_height="64dp"
-        android:text="Clean Cloud Backups"
-        android:layout_marginTop="8dp"
-        app:icon="@android:drawable/ic_menu_delete" />
+            android:text="@string/theme"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="8dp"
+            android:textColor="?attr/colorOnSurface"/>
 
-</LinearLayout>
+        <RadioGroup
+            android:id="@+id/rgTheme"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
 
-    <View
-        android:layout_width="match_parent"
-        android:layout_height="1dp"
-        android:background="?android:attr/listDivider"
-        android:layout_marginVertical="16dp"/>
+            <RadioButton
+                android:id="@+id/rbSystem"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/system_default"
+                android:padding="12dp"/>
 
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/account"
-        android:textSize="18sp"
-        android:textStyle="bold"
-        android:layout_marginBottom="8dp"
-        android:textColor="?attr/colorOnSurface"/>
+            <RadioButton
+                android:id="@+id/rbLight"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/light_mode"
+                android:padding="12dp"/>
 
-    <com.google.android.material.card.MaterialCardView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        app:cardCornerRadius="8dp"
-        app:cardElevation="2dp"
-        app:contentPadding="12dp">
+            <RadioButton
+                android:id="@+id/rbDark"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/dark_mode"
+                android:padding="12dp"/>
+        </RadioGroup>
 
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="?android:attr/listDivider"
+            android:layout_marginVertical="16dp"/>
+
+        <!-- Biometric Login Toggle -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical">
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingVertical="8dp">
 
-            <TextView
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/enable_biometric"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:textColor="?attr/colorOnSurface"/>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/biometric_desc"
+                    android:textSize="12sp"
+                    android:textColor="?attr/colorOnSurface"
+                    android:alpha="0.7"/>
+            </LinearLayout>
+
+            <androidx.appcompat.widget.SwitchCompat
+                android:id="@+id/swBiometric"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="@string/email"
-                android:textSize="12sp"
-                android:textColor="?attr/colorOnSurface"
-                android:alpha="0.6"/>
+                android:checked="true"/>
+        </LinearLayout>
 
-            <TextView
-                android:id="@+id/txtCurrentEmail"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="user@example.com"
-                android:textSize="16sp"
-                android:textColor="?attr/colorOnSurface"
-                android:layout_marginBottom="8dp"/>
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="?android:attr/listDivider"
+            android:layout_marginVertical="16dp"/>
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnChangeEmail"
-                style="@style/Widget.MaterialComponents.Button.TextButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/change_email"
-                app:icon="@android:drawable/ic_menu_edit" />
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/account"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="8dp"
+            android:textColor="?attr/colorOnSurface"/>
 
-            <View
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:cardCornerRadius="8dp"
+            app:cardElevation="2dp"
+            app:contentPadding="12dp">
+
+            <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="1dp"
-                android:background="?android:attr/listDivider"
-                android:layout_marginVertical="8dp"/>
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnChangePassword"
-                style="@style/Widget.MaterialComponents.Button.TextButton"
-                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="@string/change_password"
-                app:icon="@drawable/ic_fingerprint" />
+                android:orientation="vertical">
 
-            <com.google.android.material.button.MaterialButton
-        android:id="@+id/btnCleanFirestore"
-        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-        android:layout_width="match_parent"
-        android:layout_height="64dp"
-        android:text="Clean Cloud Backups"
-        android:layout_marginTop="8dp"
-        app:icon="@android:drawable/ic_menu_delete" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/email"
+                    android:textSize="12sp"
+                    android:textColor="?attr/colorOnSurface"
+                    android:alpha="0.6"/>
 
-</LinearLayout>
-    </com.google.android.material.card.MaterialCardView>
+                <TextView
+                    android:id="@+id/txtCurrentEmail"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="user@example.com"
+                    android:textSize="16sp"
+                    android:textColor="?attr/colorOnSurface"
+                    android:layout_marginBottom="8dp"/>
 
-    <View
-        android:id="@+id/adminDivider"
-        android:layout_width="match_parent"
-        android:layout_height="1dp"
-        android:background="?android:attr/listDivider"
-        android:layout_marginVertical="16dp"
-        android:visibility="gone"/>
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnChangeEmail"
+                    style="@style/Widget.MaterialComponents.Button.TextButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/change_email"
+                    app:icon="@android:drawable/ic_menu_edit" />
 
-    <com.google.android.material.button.MaterialButton
-        android:id="@+id/btnWipeServerData"
-        android:layout_width="match_parent"
-        android:layout_height="64dp"
-        android:text="@string/wipe_server_data"
-        android:textColor="@android:color/white"
-        app:backgroundTint="#D32F2F"
-        app:icon="@android:drawable/ic_menu_delete"
-        android:visibility="gone" />
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="?android:attr/listDivider"
+                    android:layout_marginVertical="8dp"/>
 
-    <com.google.android.material.button.MaterialButton
-        android:id="@+id/btnCleanFirestore"
-        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-        android:layout_width="match_parent"
-        android:layout_height="64dp"
-        android:text="Clean Cloud Backups"
-        android:layout_marginTop="8dp"
-        app:icon="@android:drawable/ic_menu_delete" />
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnChangePassword"
+                    style="@style/Widget.MaterialComponents.Button.TextButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/change_password"
+                    app:icon="@drawable/ic_fingerprint" />
 
-</LinearLayout>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="?android:attr/listDivider"
+            android:layout_marginVertical="16dp"/>
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnCleanFirestore"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="match_parent"
+            android:layout_height="64dp"
+            android:text="@string/clean_cloud_backups"
+            android:textColor="#4CAF50"
+            app:icon="@android:drawable/ic_menu_delete"
+            app:iconTint="#4CAF50"
+            app:strokeColor="#4CAF50"
+            app:iconSize="24dp"
+            android:layout_marginBottom="8dp" />
+
+        <View
+            android:id="@+id/adminDivider"
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="?android:attr/listDivider"
+            android:layout_marginVertical="8dp"
+            android:visibility="gone"/>
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnWipeServerData"
+            android:layout_width="match_parent"
+            android:layout_height="64dp"
+            android:text="@string/wipe_server_data"
+            android:textColor="@android:color/white"
+            app:backgroundTint="#D32F2F"
+            app:icon="@android:drawable/ic_menu_delete"
+            android:visibility="gone" />
+
+    </LinearLayout>
+</ScrollView>

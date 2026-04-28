@@ -213,22 +213,22 @@ class MainActivity : BaseActivity() {
     private fun checkAndSyncStatus() {
         val user = FirebaseAuth.getInstance().currentUser ?: return
         val userId = user.uid
-        val databaseUrl = "https://aurexscannerapp-default-rtdb.firebaseio.com"
-        val productsRef = FirebaseDatabase.getInstance(databaseUrl).getReference("products").child(userId)
+        val firestore = FirebaseUtils.getFirestore()
+        val productsCollection = firestore.collection("backups").document(userId).collection("products")
         val db = AppDatabase.getDatabase(this)
 
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 // Fetch all product codes from server with longer timeout
                 val snapshot = try {
-                    Tasks.await(productsRef.get(), 60, TimeUnit.SECONDS)
+                    Tasks.await(productsCollection.get(), 60, TimeUnit.SECONDS)
                 } catch (e: Exception) {
                     Log.e("Sync", "Initial sync fetch timed out", e)
                     null
                 }
 
-                if (snapshot != null && snapshot.exists()) {
-                    val serverProductCodes = snapshot.children.mapNotNull { it.key }.toSet()
+                if (snapshot != null && !snapshot.isEmpty) {
+                    val serverProductCodes = snapshot.documents.mapNotNull { it.id }.toSet()
                     val localProducts = db.productDao().getAllList()
                     
                     val productsToUpdate = mutableListOf<com.aurex.scanner.data.Product>()
@@ -413,20 +413,42 @@ class MainActivity : BaseActivity() {
                     return@launch
                 }
 
-                val totalCount = localProducts.size
+                // Smart Check: Get existing codes from server to avoid unnecessary uploads
                 if (progressDialog.isShowing) {
-                    progressDialog.setMessage(getString(R.string.uploading_to_firestore, totalCount))
+                    progressDialog.setMessage(getString(R.string.checking_server))
                 }
-                
+                val existingCodes = withContext(Dispatchers.IO) {
+                    try {
+                        val snapshot = Tasks.await(productsCollection.get(), 30, TimeUnit.SECONDS)
+                        snapshot.documents.map { it.id }.toSet()
+                    } catch (e: Exception) {
+                        Log.e("Backup", "Failed to fetch existing codes", e)
+                        emptySet<String>()
+                    }
+                }
+
+                val totalCount = localProducts.size
                 var uploadedCount = 0
+                var skippedCount = 0
                 var hasError = false
 
                 for (product in localProducts) {
                     if (syncJob?.isCancelled == true) break
                     
+                    if (existingCodes.contains(product.productCode)) {
+                        skippedCount++
+                        withContext(Dispatchers.IO) {
+                            if (!product.isSynced) {
+                                product.isSynced = true
+                                db.productDao().update(product)
+                            }
+                        }
+                        continue
+                    }
+
                     if (progressDialog.isShowing) {
                         withContext(Dispatchers.Main) {
-                            progressDialog.setMessage(getString(R.string.backing_up_product, product.name, uploadedCount, totalCount))
+                            progressDialog.setMessage(getString(R.string.backing_up_product, product.name, uploadedCount + skippedCount + 1, totalCount))
                         }
                     }
 
@@ -450,8 +472,8 @@ class MainActivity : BaseActivity() {
                         NotificationHelper.showProgressNotification(
                             this@MainActivity,
                             getString(R.string.cloud_backup),
-                            getString(R.string.uploaded_items, uploadedCount, totalCount),
-                            uploadedCount,
+                            getString(R.string.uploaded_items, uploadedCount + skippedCount, totalCount),
+                            uploadedCount + skippedCount,
                             totalCount,
                             false
                         )
@@ -463,12 +485,25 @@ class MainActivity : BaseActivity() {
                 if (progressDialog.isShowing) progressDialog.dismiss()
                 NotificationHelper.cancelNotification(this@MainActivity)
 
-                if (uploadedCount > 0) {
+                val summaryMsg = StringBuilder()
+                if (uploadedCount > 0) summaryMsg.append(getString(R.string.backup_success_msg, uploadedCount))
+                if (skippedCount > 0) {
+                    if (summaryMsg.isNotEmpty()) summaryMsg.append("\n")
+                    summaryMsg.append(getString(R.string.duplicate_skipped) + ": $skippedCount")
+                }
+                if (hasError) {
+                    if (summaryMsg.isNotEmpty()) summaryMsg.append("\n")
+                    summaryMsg.append("Some items failed to upload.")
+                }
+
+                if (uploadedCount > 0 || skippedCount > 0) {
                     AlertDialog.Builder(this@MainActivity)
                         .setTitle(R.string.backup_success_title)
-                        .setMessage(getString(R.string.backup_success_msg, uploadedCount) + (if (hasError) "\nSome items failed to upload." else ""))
+                        .setMessage(summaryMsg.toString())
                         .setPositiveButton(R.string.ok, null)
                         .show()
+                } else if (!hasError) {
+                    Toast.makeText(this@MainActivity, R.string.duplicate_skipped, Toast.LENGTH_SHORT).show()
                 } else {
                     Toast.makeText(this@MainActivity, R.string.backup_failed, Toast.LENGTH_LONG).show()
                 }
@@ -554,10 +589,14 @@ class MainActivity : BaseActivity() {
                     // Process RTDB data
                     val products = mutableListOf<com.aurex.scanner.data.Product>()
                     for (child in rtdbSnapshot.children) {
-                        child.getValue(com.aurex.scanner.data.Product::class.java)?.let { product ->
-                            if (product.productCode.isEmpty()) product.productCode = child.key ?: ""
-                            product.isSynced = true
-                            products.add(product)
+                        try {
+                            child.getValue(com.aurex.scanner.data.Product::class.java)?.let { product ->
+                                if (product.productCode.isEmpty()) product.productCode = child.key ?: ""
+                                product.isSynced = true
+                                products.add(product)
+                            }
+                        } catch (e: Exception) {
+                            Log.e("Restore", "Error parsing legacy product", e)
                         }
                     }
                     
@@ -658,9 +697,6 @@ class MainActivity : BaseActivity() {
 
     private fun scheduleExpiryCheck() {
         val expiryWorkRequest = PeriodicWorkRequestBuilder<ExpiryWorker>(1, TimeUnit.DAYS)
-            .setConstraints(Constraints.Builder()
-                .setRequiredNetworkType(NetworkType.CONNECTED)
-                .build())
             .addTag("expiry_check")
             .build()
 

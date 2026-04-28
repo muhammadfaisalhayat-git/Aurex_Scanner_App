@@ -1,6 +1,8 @@
 package com.aurex.scanner.ui
 
 import android.content.Intent
+import android.media.AudioManager
+import android.media.ToneGenerator
 import android.os.Bundle
 import android.util.Log
 import android.widget.ImageButton
@@ -20,6 +22,7 @@ class BarcodeScannerActivity : BaseActivity() {
 
     private lateinit var previewView: PreviewView
     private lateinit var cameraExecutor: ExecutorService
+    private val toneGenerator = ToneGenerator(AudioManager.STREAM_NOTIFICATION, 100)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -59,8 +62,10 @@ class BarcodeScannerActivity : BaseActivity() {
                             for (barcode in barcodes) {
                                 val code = barcode.rawValue
                                 if (code != null) {
+                                    toneGenerator.startTone(ToneGenerator.TONE_PROP_BEEP, 150)
+                                    val cleanedCode = com.aurex.scanner.scanner.TextParser.cleanProductCode(code)
                                     val resultIntent = Intent()
-                                    resultIntent.putExtra("SCAN_RESULT", code)
+                                    resultIntent.putExtra("SCAN_RESULT", cleanedCode)
                                     setResult(RESULT_OK, resultIntent)
                                     finish()
                                     break
@@ -92,6 +97,7 @@ class BarcodeScannerActivity : BaseActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        toneGenerator.release()
         cameraExecutor.shutdown()
     }
 }

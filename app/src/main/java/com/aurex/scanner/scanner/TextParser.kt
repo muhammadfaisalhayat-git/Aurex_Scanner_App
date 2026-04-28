@@ -8,18 +8,18 @@ import kotlin.math.abs
 object TextParser {
 
     private val mfgKeywords = listOf(
-        "production", "mfg", "mfd", "manufacture", "prod", "p :", "p.", "mfd date", "mfg date", "test date",
+        "production", "mfg", "mfd", "manufacture", "prod", "p:", "p :", "p.", "mfd date", "mfg date", "test date", "date of product", "date of production",
         "انتاج", "تاريخ الانتاج", "تاريخ الإنتاج", "تاريخ الصنع", "تاريخ التصنيع", "صنع", "ت.ا", "DOM", "MFD", "تعبئة", "تعبئة في", "فحص", "تاريخ الفحص", "ت الفحص", "ت. فحص", "ت.فحص"
     )
 
     private val expKeywords = listOf(
-        "expiry", "exp", "expire", "best before", "e :", "e.", "exp.", "expiry date", "use by",
-        "انتهاء", "تاريخ الانتهاء", "تاريخ الإنتهاء", "ت.هـ", "DOE", "EXP", "يستخدم قبل", "ينتهي في", "تاريخ انتهاء", "صالح حتى"
+        "expiry", "exp", "ex:", "ex.", "expire", "best before", "e:", "e :", "e.", "exp.", "expiry date", "use by", "date of expiry", "date of expiration",
+        "انتهاء", "تاريخ الانتهاء", "تاريخ الإنتهاء", "تاريخ النتهاء", "ت.هـ", "DOE", "EXP", "يستخدم قبل", "ينتهي في", "تاريخ انتهاء", "صالح حتى"
     )
 
     private val nameKeywords = listOf(
-        "product name", "name", "variety", "product", "item", "brand",
-        "اسم المنتج", "المنتج", "الاسم", "صنف", "صنف :", "المادة", "نوع", "اسم الصنف", "ماركة"
+        "product name", "name", "variety", "product", "item", "brand", "crop",
+        "اسم المنتج", "المنتج", "الاسم", "صنف", "صنف :", "المادة", "نوع", "اسم الصنف", "ماركة", "المحصول"
     )
 
     private val sizeKeywords = listOf(
@@ -28,11 +28,12 @@ object TextParser {
     )
 
     private val lotKeywords = listOf(
-        "lot", "batch", "رقم اللوط", "رقم التشغيلة", "رقم", "batch no", "lot no", "لوط", "رقم اللوط :"
+        "lot", "batch", "b/n", "b/n:", "bn:", "b.n:", "رقم اللوط", "رقم التشغيلة", "رقم", "batch no", "lot no", "لوط", "رقم اللوط :"
     )
 
     private val validityKeywords = listOf(
-        "validity", "period", "duration", "الصلاحية", "صالح لمدة", "صلاحية", "مدة الصلاحية", "فترة الصلاحية", "تاريخ الصلاحية"
+        "validity", "period", "duration", "الصلاحية", "صالح لمدة", "صلاحية", "مدة الصلاحية", "فترة الصلاحية", "تاريخ الصلاحية",
+        "سنة", "سنتين", "سنتان", "عام", "عامان", "عامين", "أعوام", "سنوات", "شهر", "شهور", "أشهر", "شهران", "شهرين"
     )
 
     private val datePatterns = listOf(
@@ -58,7 +59,49 @@ object TextParser {
         Regex("""\b\d{6}\b""")  // MMYYYY or DDMMYY
     )
 
-    private val unitRegex = Regex("""(\d+\.?\d*)\s*(kg|g|l|ml|liter|litres|gram|kilogram|kgm|مل|جم|كجم|لتر)""", RegexOption.IGNORE_CASE)
+    private val unitRegex = Regex("""(\d+\.?\d*)\s*(kg|g|mg|gr|ks|l|ml|liter|litres|gram|kilogram|kgm|غم|غرام|مل|ملي|ك|كيلو|كيلوجرام|كيلو جرام|جرام)""", RegexOption.IGNORE_CASE)
+
+    fun cleanProductCode(code: String): String {
+        var c = code.trim()
+        
+        // Remove AIM Symbology Identifiers (e.g., ]C1, ]E0, ]d2, etc.)
+        // These are always 3 characters starting with ]
+        val aimRegex = Regex("""\][A-Za-z][0-9]""")
+        c = c.replace(aimRegex, "")
+
+        // Handle common OCR/Barcode misinterpretations of the GS1-128 identifier
+        // and bracketed versions that sometimes appear.
+        val technicalPrefixes = listOf(
+            "[C1", "]C1", "|C1", "1C1", "(01)", "01)", "]C1 ", "[C1 "
+        )
+        
+        var foundPrefix = true
+        while (foundPrefix) {
+            foundPrefix = false
+            for (prefix in technicalPrefixes) {
+                if (c.startsWith(prefix, ignoreCase = true)) {
+                    c = c.substring(prefix.length).trim()
+                    foundPrefix = true
+                }
+            }
+            // Also handle if it starts with ']' and then some letters/numbers
+            if (c.startsWith("]")) {
+                c = c.substring(1).trim()
+                foundPrefix = true
+            }
+        }
+        
+        // Remove any leading zeros that are often part of GS1 AI(01) but not wanted in the code
+        // Only if the code is long (GTIN-14 style)
+        if (c.length > 10 && c.startsWith("00")) {
+            c = c.substring(2)
+        } else if (c.length > 10 && c.startsWith("0")) {
+            // c = c.substring(1) // Optional: some users want the leading zero, some don't. 
+            // Usually for batch/serial we keep it unless it's a GTIN prefix.
+        }
+
+        return c.trim().removePrefix(":").trim()
+    }
 
     fun parseRaw(rawText: String): Product {
         Log.d("TextParser", "Parsing raw text: $rawText")
@@ -70,16 +113,29 @@ object TextParser {
         val normalizedRaw = normalizeDigits(rawText)
         
         // Detect size/weight
-        unitRegex.find(normalizedRaw)?.let {
-            foundSize = it.value
+        // Enhanced size detection for cases like "الوزن الصافي : 400 جرام"
+        val sizeMatch = unitRegex.find(normalizedRaw)
+        if (sizeMatch != null) {
+            foundSize = sizeMatch.value
+        } else {
+            // Try looking after keywords
+            for (key in sizeKeywords) {
+                if (normalizedRaw.contains(key)) {
+                    val afterKey = normalizedRaw.substringAfter(key).trim(':').trim()
+                    unitRegex.find(afterKey)?.let {
+                        foundSize = it.value
+                    }
+                    if (foundSize != null) break
+                }
+            }
         }
         
         // Look for Product Code/Batch
         for (key in lotKeywords) {
             if (normalizedRaw.lowercase().contains(key.lowercase())) {
                 val value = normalizedRaw.lowercase().substringAfter(key.lowercase()).trim(':').trim()
-                val code = value.split(Regex("""\s""")).firstOrNull() ?: ""
-                if (code.length >= 2) foundProductCode = code
+                val codeLine = value.substringBefore("\n").trim()
+                if (codeLine.length >= 2) foundProductCode = cleanProductCode(codeLine)
             }
         }
         
@@ -136,9 +192,10 @@ object TextParser {
     }
 
     private fun extractDates(text: String): List<String> {
+        val normalized = normalizeDigitsForDates(text)
         val found = mutableListOf<String>()
         for (pattern in datePatterns) {
-            pattern.findAll(text).forEach { match ->
+            pattern.findAll(normalized).forEach { match ->
                 var raw = match.value.trim()
                 if (raw.any { it.isLetter() }) {
                     convertTextDateToNumeric(raw)?.let { found.add(it) }
@@ -165,7 +222,7 @@ object TextParser {
 
     private fun extractSmartNameFromRaw(rawText: String): String {
         val lines = rawText.lines().filter { it.isNotBlank() }
-        val noise = Regex("""(?i)batch|lot|weight|net|tel|phone|price|egp|le|pcs|size|qty|\d|انتاج|فحص|تاريخ|exp|mfg|prod|date|expiry""")
+        val noise = Regex("""(?i)batch|lot|weight|net|tel|phone|price|egp|le|pcs|size|qty|p:|e:|b/n|\d|انتاج|فحص|تاريخ|exp|mfg|prod|date|expiry|الصافي|وزن""")
         for (line in lines.take(5)) {
             val trimmed = line.trim().substringBefore("Prod").substringBefore("EXP").trim()
             if (trimmed.length > 4 && !noise.containsMatchIn(trimmed)) return trimmed
@@ -181,8 +238,21 @@ object TextParser {
         var foundValidityText = ""
         
         val fullText = normalizeDigits(mlText.text)
-        unitRegex.find(fullText)?.let {
-            foundSize = it.value
+        
+        // Enhanced size detection for ML Text
+        val sizeMatch = unitRegex.find(fullText)
+        if (sizeMatch != null) {
+            foundSize = sizeMatch.value
+        } else {
+            for (key in sizeKeywords) {
+                if (fullText.contains(key)) {
+                    val afterKey = fullText.substringAfter(key).trim(':').trim()
+                    unitRegex.find(afterKey)?.let {
+                        foundSize = it.value
+                    }
+                    if (foundSize != null) break
+                }
+            }
         }
 
         for (block in mlText.textBlocks) {
@@ -190,8 +260,8 @@ object TextParser {
             for (key in lotKeywords) {
                 if (normalizedBlockText.contains(key.lowercase())) {
                     val value = normalizedBlockText.substringAfter(key.lowercase()).trim(':').trim()
-                    val code = value.split(Regex("""\s""")).firstOrNull() ?: ""
-                    if (code.length >= 2) foundProductCode = code
+                    val codeLine = value.substringBefore("\n").trim()
+                    if (codeLine.length >= 2) foundProductCode = cleanProductCode(codeLine)
                 }
             }
             for (key in validityKeywords) {
@@ -223,12 +293,13 @@ object TextParser {
         for (dateElem in dateElements) {
             val dateBox = dateElem.line.boundingBox ?: continue
             var bestType = 0 
-            var minDist = 400f
+            var minDist = 600f // Increased distance for complex labels
             
             for (block in mlText.textBlocks) {
                 val bBox = block.boundingBox ?: continue
                 val bText = block.text.lowercase()
-                val dist = abs(bBox.centerY() - dateBox.centerY()).toFloat() + abs(bBox.left - dateBox.left).toFloat() * 0.5f
+                // Reduced weight for horizontal distance as labels are often far left/right
+                val dist = abs(bBox.centerY() - dateBox.centerY()).toFloat() + abs(bBox.left - dateBox.left).toFloat() * 0.3f
                 
                 if (dist < minDist) {
                     if (mfgKeywords.any { bText.contains(it) }) { bestType = 1; minDist = dist }
@@ -281,19 +352,53 @@ object TextParser {
 
     private fun calculateExpiry(base: String?, validity: String?): String? {
         if (base == null) return null
-        var y = 1; var m = 0
+        var y = 0; var m = 0
         val low = validity?.lowercase() ?: ""
-        if (low.contains("سنتين") || low.contains("2 years")) y = 2
-        else if (low.contains("سنة") || low.contains("1 year")) y = 1
+        
+        // 2 Years (dual form) with fuzzy Arabic matching
+        if (low.contains("سنتين") || low.contains("سنتان") || low.contains("عامان") || low.contains("عامين") || 
+            low.contains("سنه تين") || low.contains("2 years") || low.contains("2 year")) {
+            y = 2
+        } 
+        // X Years
+        else if (low.contains("سنة") || low.contains("عام") || low.contains("أعوام") || low.contains("سنوات") || low.contains("year")) {
+            val match = Regex("""(\d+)""").find(low)
+            y = match?.groupValues?.get(1)?.toIntOrNull() ?: 1
+        }
+        
+        // 2 Months (dual form)
+        if (low.contains("شهران") || low.contains("شهرين") || low.contains("2 months") || low.contains("2 month")) {
+            m = 2
+        }
+        // X Months
+        else if (low.contains("شهر") || low.contains("شهور") || low.contains("أشهر") || low.contains("month")) {
+            val match = Regex("""(\d+)""").find(low)
+            m = match?.groupValues?.get(1)?.toIntOrNull() ?: 0
+            if (y == 0 && m == 0) m = 1 
+        }
+
+        if (y == 0 && m == 0) y = 2 // Reverted to default 2 years if context was matched
+
         return addTimeToDate(base, y, m)
     }
 
     private fun addTimeToDate(date: String, years: Int, months: Int): String? {
         val parts = date.split('/')
         return try {
-            var y = parts.last().toInt().let { if (it < 100) 2000 + it else it }
-            var m = if (parts.size >= 2) parts[parts.size - 2].toInt() else 1
-            val d = if (parts.size == 3) parts[0].toInt() else 1
+            val v1 = parts[0].toInt()
+            val v2 = parts[1].toInt()
+            val v3 = if (parts.size > 2) parts[2].toInt() else 1
+
+            var y: Int; var m: Int; var d: Int
+            if (v1 > 100) { // YYYY/MM/DD or YYYY/MM
+                y = v1; m = v2; d = v3
+            } else if (parts.size == 2) { // MM/YYYY or MM/YY
+                y = if (v2 < 100) 2000 + v2 else v2; m = v1; d = 1
+            } else { // DD/MM/YYYY or DD/MM/YY
+                val yearPart = parts.last().toInt()
+                y = if (yearPart < 100) 2000 + yearPart else yearPart; m = v2; d = v1
+            }
+
             m += months; y += years + (m - 1) / 12; m = (m - 1) % 12 + 1
             "${d.toString().padStart(2,'0')}/${m.toString().padStart(2,'0')}/$y"
         } catch (e: Exception) { null }
@@ -301,12 +406,30 @@ object TextParser {
 
     private fun extractSmartName(mlText: Text, lot: String): String {
         val candidates = mutableListOf<NameCandidate>()
-        val noise = Regex("""(?i)batch|lot|weight|net|tel|phone|price|egp|le|pcs|size|qty|\d|انتاج|فحص|تاريخ|exp|mfg|prod|date|expiry""")
+        // Improved noise filter to exclude registration numbers and common non-name terms
+        val noise = Regex("""(?i)batch|lot|weight|net|tel|phone|price|egp|le|pcs|size|qty|p:|e:|b/n|انتاج|فحص|تاريخ|exp|mfg|prod|date|expiry|الصافي|وزن|تسجيل|رقم|s000|\b\d{4,}\b""")
         
         for (block in mlText.textBlocks) {
-            val text = block.text.trim().replace("\n", " ").substringBefore("Prod").substringBefore("EXP").trim()
+            val originalText = block.text.trim().replace("\n", " ")
+            val bBox = block.boundingBox ?: continue
+            
+            // Priority 1: Text following an Arabic or English name keyword
+            for (key in nameKeywords) {
+                if (originalText.contains(key)) {
+                    val afterKey = originalText.substringAfter(key).trim(':').trim()
+                    if (afterKey.length > 2 && !noise.containsMatchIn(afterKey)) {
+                        return afterKey.substringBefore("EXP").substringBefore("MFG").trim()
+                    }
+                }
+            }
+
+            val text = originalText.substringBefore("Prod").substringBefore("EXP").trim()
             if (text.length < 3 || noise.containsMatchIn(text)) continue
-            val score = (block.boundingBox?.height() ?: 0).toDouble() / (block.boundingBox?.top ?: 1 + 100)
+            
+            // Score based on text size (larger is better for titles) and position (higher is better)
+            // Penalty for being too low on the page
+            val yFactor = 1.0 - (bBox.top.toDouble() / 1000.0)
+            val score = bBox.height().toDouble() * 2.0 * yFactor
             candidates.add(NameCandidate(text, score))
         }
         
@@ -332,16 +455,25 @@ object TextParser {
     private data class NameCandidate(val text: String, val score: Double)
 
     private fun normalizeDigits(input: String): String {
+        val m = mapOf('٠' to '0', '١' to '1', '٢' to '2', '٣' to '3', '٤' to '4', '٥' to '5', '٦' to '6', '٧' to '7', '٨' to '8', '٩' to '9')
+        return input.map { m[it] ?: it }.joinToString("")
+    }
+
+    private fun normalizeDigitsForDates(input: String): String {
         val m = mapOf('٠' to '0', '١' to '1', '٢' to '2', '٣' to '3', '٤' to '4', '٥' to '5', '٦' to '6', '٧' to '7', '٨' to '8', '٩' to '9', 'o' to '0', 'O' to '0', 'l' to '1', 'I' to '1', 's' to '5', 'S' to '5', 'b' to '6', 'z' to '2')
         return input.map { m[it] ?: it }.joinToString("")
     }
 
     private fun isValidDate(date: String): Boolean {
         val p = date.split('/')
+        if (p.size < 2) return false
         return try {
-            val d1 = p[0].toInt(); val d2 = p.last().toInt()
-            val m = if (p.size >= 2) p[p.size-2].toInt() else 1
-            (m in 1..12) && ((d1 in 2020..2040) || (d1 in 1..31 && d2 in 20..40) || (d1 in 1..31 && d2 in 2020..2040))
+            val v1 = p[0].toInt()
+            val v2 = p.last().toInt()
+            // Identify year: either 4 digits or > 31
+            val year = if (v1 > 100) v1 else if (v2 > 100) v2 else if (v1 > 31) 2000 + v1 else 2000 + v2
+            val month = if (v1 > 100) p[1].toInt() else if (v2 > 100) v1 else if (v1 > 12) v2 else v1
+            (month in 1..12) && (year in 2020..2045)
         } catch (e: Exception) { false }
     }
 
@@ -370,11 +502,17 @@ object TextParser {
         val p = date.split('/')
         var y = "2000"; var m = "01"; var d = "01"
         try {
+            val v1 = p[0].toInt()
+            val v2 = p.last().toInt()
+            
             if (p.size == 2) {
-                if (p[1].toInt() > 50) { y = p[1]; m = p[0] } else { y = "20" + p[1]; m = p[0] }
+                if (v1 > 100) { y = v1.toString(); m = v2.toString() }
+                else if (v2 > 100) { y = v2.toString(); m = v1.toString() }
+                else if (v1 > 12) { y = "20$v1"; m = v2.toString() }
+                else { y = "20$v2"; m = v1.toString() }
             } else if (p.size == 3) {
-                if (p[0].length == 4) { y = p[0]; m = p[1]; d = p[2] }
-                else { y = p[2]; m = p[1]; d = p[0] }
+                if (v1 > 100) { y = v1.toString(); m = p[1]; d = p[2] }
+                else { y = v2.toString(); m = p[1]; d = v1.toString() }
             }
             if (y.length == 2) y = "20$y"
         } catch (e: Exception) {}

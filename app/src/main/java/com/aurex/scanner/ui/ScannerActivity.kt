@@ -25,10 +25,12 @@ import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import com.google.mlkit.vision.text.Text
 import androidx.exifinterface.media.ExifInterface
-import android.graphics.Matrix
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Matrix
 import android.graphics.Rect
+import android.view.ScaleGestureDetector
+import android.view.MotionEvent
 import androidx.appcompat.app.AlertDialog
 import java.io.File
 import java.io.FileOutputStream
@@ -42,25 +44,31 @@ class ScannerActivity : BaseActivity() {
     private lateinit var captureBtn: ImageButton
     private lateinit var flashBtn: ImageButton
     private lateinit var historyBtn: ImageButton
-    private lateinit var camera: Camera
+    private lateinit var camera: androidx.camera.core.Camera
     private lateinit var imageCapture: ImageCapture
     private lateinit var imageAnalysis: ImageAnalysis
     private lateinit var cameraExecutor: ExecutorService
     private lateinit var overlay: ScannerOverlayView
 
+    private lateinit var scaleGestureDetector: ScaleGestureDetector
+
     private val shutterSound = MediaActionSound()
 
     // Use Latin Recognizer for live feedback
-    private val textRecognizer = TextRecognition.getClient(
-        TextRecognizerOptions.DEFAULT_OPTIONS
-    )
+    private val textRecognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
 
     private var isFlashOn = false
     private var detectedBarcode: String? = null
     private var lastDetectionTime = 0L
 
+    private var isSingleScanMode = false
+    private var scanTarget: String? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        isSingleScanMode = intent.getBooleanExtra("SINGLE_SCAN_MODE", false)
+        scanTarget = intent.getStringExtra("SCAN_TARGET")
 
         // Make full screen
         window.decorView.systemUiVisibility = (android.view.View.SYSTEM_UI_FLAG_FULLSCREEN
@@ -75,6 +83,8 @@ class ScannerActivity : BaseActivity() {
         flashBtn = findViewById(R.id.btnFlash)
         historyBtn = findViewById(R.id.btnHistory)
         overlay = findViewById(R.id.overlay)
+
+        setupZoom()
 
         cameraExecutor = Executors.newSingleThreadExecutor()
 
@@ -96,6 +106,28 @@ class ScannerActivity : BaseActivity() {
         flashBtn.setOnClickListener { toggleFlash() }
         historyBtn.setOnClickListener {
             startActivity(Intent(this, ProductListActivity::class.java))
+        }
+    }
+
+    private fun setupZoom() {
+        val listener = object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
+            override fun onScale(detector: ScaleGestureDetector): Boolean {
+                if (::camera.isInitialized) {
+                    val currentZoomRatio = camera.cameraInfo.zoomState.value?.zoomRatio ?: 1f
+                    val delta = detector.scaleFactor
+                    camera.cameraControl.setZoomRatio(currentZoomRatio * delta)
+                }
+                return true
+            }
+        }
+        scaleGestureDetector = ScaleGestureDetector(this, listener)
+
+        previewView.setOnTouchListener { view, event ->
+            scaleGestureDetector.onTouchEvent(event)
+            if (event.action == MotionEvent.ACTION_UP) {
+                view.performClick()
+            }
+            true
         }
     }
 
@@ -160,7 +192,19 @@ class ScannerActivity : BaseActivity() {
                     barcodeScanner.process(image)
                         .addOnSuccessListener { barcodes ->
                             for (barcode in barcodes) {
-                                detectedBarcode = barcode.rawValue
+                                // Strip common technical prefixes like ]C1 or [C1 via TextParser
+                                val raw = barcode.rawValue ?: ""
+                                if (raw.isNotEmpty()) {
+                                    if (detectedBarcode == null) {
+                                        // Play beep for first detection in live view
+                                        try {
+                                            val toneG = android.media.ToneGenerator(android.media.AudioManager.STREAM_NOTIFICATION, 100)
+                                            toneG.startTone(android.media.ToneGenerator.TONE_PROP_BEEP, 100)
+                                        } catch (e: Exception) {}
+                                    }
+                                    detectedBarcode = TextParser.cleanProductCode(raw)
+                                    Log.d("ScannerActivity", "Detected Barcode: $detectedBarcode (raw: $raw)")
+                                }
                             }
                         }
                         .addOnCompleteListener {
@@ -225,6 +269,12 @@ class ScannerActivity : BaseActivity() {
         // 3. Process the compressed/rotated image
         OCRProcessor.process(this, Uri.fromFile(permanentFile)) { product ->
             var finalProduct = product
+            
+            // If OCR didn't find a product code but the barcode scanner did, use that
+            if (finalProduct.productCode.isEmpty() && detectedBarcode != null) {
+                finalProduct = finalProduct.copy(productCode = detectedBarcode!!)
+            }
+
             if (finalProduct.name == "Unknown Product" || finalProduct.name == "Unknown") {
                 if (detectedBarcode != null) {
                     finalProduct.name = "Barcode: $detectedBarcode"
@@ -268,9 +318,24 @@ class ScannerActivity : BaseActivity() {
     }
 
     private fun navigateToResult(product: com.aurex.scanner.data.Product) {
-        val intent = Intent(this, ResultActivity::class.java)
-        intent.putExtra("data", product)
-        startActivity(intent)
+        if (isSingleScanMode) {
+            val resultIntent = Intent()
+            val resultValue = when (scanTarget) {
+                "NAME" -> product.name
+                "CODE" -> product.productCode
+                "SIZE" -> product.size
+                "MFG" -> product.mfgDate
+                "EXP" -> product.expDate
+                else -> product.name
+            }
+            resultIntent.putExtra("SCAN_RESULT", resultValue)
+            setResult(RESULT_OK, resultIntent)
+            finish()
+        } else {
+            val intent = Intent(this, ResultActivity::class.java)
+            intent.putExtra("data", product)
+            startActivity(intent)
+        }
     }
 
     private fun fixImageRotation(file: File) {
