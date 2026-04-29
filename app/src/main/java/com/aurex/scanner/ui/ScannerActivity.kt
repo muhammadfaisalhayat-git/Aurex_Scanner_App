@@ -49,6 +49,10 @@ class ScannerActivity : BaseActivity() {
     private lateinit var imageAnalysis: ImageAnalysis
     private lateinit var cameraExecutor: ExecutorService
     private lateinit var overlay: ScannerOverlayView
+    private lateinit var processingLayout: android.view.View
+    private lateinit var controlsLayout: android.view.View
+    private lateinit var ivCapturedPreview: android.widget.ImageView
+    private lateinit var processingOverlay: com.aurex.scanner.ScannerOverlayView
 
     private lateinit var scaleGestureDetector: ScaleGestureDetector
 
@@ -83,6 +87,10 @@ class ScannerActivity : BaseActivity() {
         flashBtn = findViewById(R.id.btnFlash)
         historyBtn = findViewById(R.id.btnHistory)
         overlay = findViewById(R.id.overlay)
+        processingLayout = findViewById(R.id.processingLayout)
+        controlsLayout = findViewById(R.id.controlsLayout)
+        ivCapturedPreview = findViewById(R.id.ivCapturedPreview)
+        processingOverlay = findViewById(R.id.processingOverlay)
 
         setupZoom()
 
@@ -106,6 +114,22 @@ class ScannerActivity : BaseActivity() {
         flashBtn.setOnClickListener { toggleFlash() }
         historyBtn.setOnClickListener {
             startActivity(Intent(this, ProductListActivity::class.java))
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        resetScannerUI()
+    }
+
+    private fun resetScannerUI() {
+        runOnUiThread {
+            processingLayout.visibility = android.view.View.GONE
+            controlsLayout.visibility = android.view.View.VISIBLE
+            ivCapturedPreview.setImageDrawable(null)
+            processingOverlay.setStaticImageMode(false)
+            detectedBarcode = null
+            lastDetectionTime = 0L
         }
     }
 
@@ -233,29 +257,75 @@ class ScannerActivity : BaseActivity() {
     }
 
     private fun takePhoto() {
+        if (!::imageCapture.isInitialized) return
+
+        // Force target rotation to match current display
+        try {
+            val rotation = previewView.display.rotation
+            imageCapture.targetRotation = rotation
+        } catch (e: Exception) {
+            Log.e("ScannerActivity", "Failed to set target rotation", e)
+        }
+
         shutterSound.play(MediaActionSound.SHUTTER_CLICK)
+
+        processingLayout.visibility = android.view.View.VISIBLE
+        controlsLayout.visibility = android.view.View.GONE
 
         val photoFile = File(externalCacheDir, "scan.jpg")
         val outputOptions = ImageCapture.OutputFileOptions.Builder(photoFile).build()
 
         imageCapture.takePicture(
             outputOptions,
-            ContextCompat.getMainExecutor(this),
+            cameraExecutor,
             object : ImageCapture.OnImageSavedCallback {
                 override fun onImageSaved(output: ImageCapture.OutputFileResults) {
+                    // 1. Fix rotation immediately on the background thread
+                    // We also pass the rotation degrees from the metadata if available
+                    fixImageRotation(photoFile)
+                    
+                    val bitmap = BitmapFactory.decodeFile(photoFile.absolutePath)
+                    
+                    runOnUiThread {
+                        if (bitmap != null) {
+                            ivCapturedPreview.setImageBitmap(bitmap)
+                            processingOverlay.setImageSize(bitmap.width, bitmap.height)
+                            
+                            // 2. Start text detection for the animation
+                            getDetectedTextBlocks(photoFile)
+                        }
+                    }
                     processImage(photoFile)
                 }
 
                 override fun onError(exc: ImageCaptureException) {
+                    resetScannerUI()
                     Toast.makeText(this@ScannerActivity, "Capture failed", Toast.LENGTH_SHORT).show()
                 }
             }
         )
     }
 
+    private fun getDetectedTextBlocks(file: File) {
+        // We use ML Kit to quickly get text blocks for highlighting
+        try {
+            val image = InputImage.fromFilePath(this, Uri.fromFile(file))
+            textRecognizer.process(image).addOnSuccessListener { visionText ->
+                // Filter blocks to focus on relevant text (avoiding tiny background noise)
+                val blocks = visionText.textBlocks.filter { block ->
+                    val t = block.text
+                    t.length >= 3 && (t.any { it.isDigit() } || t.length > 5)
+                }.mapNotNull { it.boundingBox }
+
+                processingOverlay.setStaticImageMode(true, blocks)
+            }
+        } catch (e: Exception) {
+            Log.e("ScannerActivity", "Error detecting blocks for overlay", e)
+        }
+    }
+
     private fun processImage(file: File) {
-        // 1. Fix rotation
-        fixImageRotation(file)
+        // Rotation is already fixed in onImageSaved
 
         val permanentFile = File(
             getExternalFilesDir(Environment.DIRECTORY_PICTURES),
@@ -311,7 +381,7 @@ class ScannerActivity : BaseActivity() {
                 navigateToResult(product)
             }
             .setNegativeButton(getString(R.string.discard)) { _, _ ->
-                // Just go back to scanning
+                resetScannerUI()
             }
             .setCancelable(false)
             .show()
@@ -341,10 +411,26 @@ class ScannerActivity : BaseActivity() {
     private fun fixImageRotation(file: File) {
         try {
             val exif = ExifInterface(file.absolutePath)
-            val orientation = exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)
-            if (orientation == ExifInterface.ORIENTATION_NORMAL || orientation == ExifInterface.ORIENTATION_UNDEFINED) return
+            var orientation = exif.getAttributeInt(
+                ExifInterface.TAG_ORIENTATION,
+                ExifInterface.ORIENTATION_UNDEFINED
+            )
 
             val bitmap = BitmapFactory.decodeFile(file.absolutePath) ?: return
+
+            // If EXIF orientation is missing but the image is wider than tall, 
+            // and we are in portrait mode, it likely needs a 90-degree rotation.
+            if (orientation == ExifInterface.ORIENTATION_UNDEFINED || orientation == ExifInterface.ORIENTATION_NORMAL) {
+                if (bitmap.width > bitmap.height) {
+                    orientation = ExifInterface.ORIENTATION_ROTATE_90
+                }
+            }
+
+            if (orientation == ExifInterface.ORIENTATION_NORMAL || orientation == ExifInterface.ORIENTATION_UNDEFINED) {
+                // If it's already vertical or we can't determine, just ensure it's saved at high quality
+                return
+            }
+
             val matrix = Matrix()
             when (orientation) {
                 ExifInterface.ORIENTATION_ROTATE_90 -> matrix.postRotate(90f)
@@ -353,22 +439,34 @@ class ScannerActivity : BaseActivity() {
                 ExifInterface.ORIENTATION_FLIP_HORIZONTAL -> matrix.postScale(-1f, 1f)
                 ExifInterface.ORIENTATION_FLIP_VERTICAL -> matrix.postScale(1f, -1f)
             }
-            
+
             val rotatedBitmap = Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
             
+            // 3. Crop to the frame shown in the overlay
+            // Overlay uses: left=10%, top=20%, right=90%, bottom=80%
+            val cropLeft = (rotatedBitmap.width * 0.10f).toInt()
+            val cropTop = (rotatedBitmap.height * 0.20f).toInt()
+            val cropWidth = (rotatedBitmap.width * 0.80f).toInt()
+            val cropHeight = (rotatedBitmap.height * 0.60f).toInt()
+            
+            val croppedBitmap = Bitmap.createBitmap(rotatedBitmap, cropLeft, cropTop, cropWidth, cropHeight)
+            
             FileOutputStream(file).use { out ->
-                rotatedBitmap.compress(Bitmap.CompressFormat.JPEG, 100, out)
+                croppedBitmap.compress(Bitmap.CompressFormat.JPEG, 95, out)
             }
             
-            // Reset orientation in EXIF
+            // Reset orientation in EXIF to normal so it's not rotated twice
             val newExif = ExifInterface(file.absolutePath)
             newExif.setAttribute(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL.toString())
             newExif.saveAttributes()
 
-            bitmap.recycle()
+            if (bitmap != rotatedBitmap) {
+                bitmap.recycle()
+            }
             rotatedBitmap.recycle()
+            croppedBitmap.recycle()
         } catch (e: Exception) {
-            Log.e("ScannerActivity", "Error fixing rotation", e)
+            Log.e("ScannerActivity", "Error fixing rotation and cropping", e)
         }
     }
 
@@ -433,20 +531,20 @@ class ScannerActivity : BaseActivity() {
         val right = parts[2].toFloat()
         val bottom = parts[3].toFloat()
 
-        // Correctly handle coordinate mapping considering image rotation
-        // For 90 or 270 degrees, swap width and height
+        // Correctly handle coordinate mapping for CENTER_CROP (default for PreviewView)
         val isRotated = imageProxy.imageInfo.rotationDegrees % 180 != 0
         val imageWidth = if (isRotated) imageProxy.height.toFloat() else imageProxy.width.toFloat()
         val imageHeight = if (isRotated) imageProxy.width.toFloat() else imageProxy.height.toFloat()
 
-        val scaleX = previewView.width.toFloat() / imageWidth
-        val scaleY = previewView.height.toFloat() / imageHeight
+        val scale = Math.max(previewView.width.toFloat() / imageWidth, previewView.height.toFloat() / imageHeight)
+        val offsetX = (previewView.width - imageWidth * scale) / 2f
+        val offsetY = (previewView.height - imageHeight * scale) / 2f
 
         return Rect(
-            (left * scaleX).toInt(),
-            (top * scaleY).toInt(),
-            (right * scaleX).toInt(),
-            (bottom * scaleY).toInt()
+            (left * scale + offsetX).toInt(),
+            (top * scale + offsetY).toInt(),
+            (right * scale + offsetX).toInt(),
+            (bottom * scale + offsetY).toInt()
         )
     }
 

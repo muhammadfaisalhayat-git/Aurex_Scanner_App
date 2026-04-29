@@ -11,6 +11,7 @@ import android.widget.EditText
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.work.*
@@ -56,6 +57,15 @@ import com.aurex.scanner.data.Notification
 import com.aurex.scanner.util.NotificationHelper
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.Typeface
+import android.view.ViewGroup
+import com.github.chrisbanes.photoview.PhotoView
+import com.bumptech.glide.Glide
+import com.aurex.scanner.ProductAdapter
 
 class MainActivity : BaseActivity() {
     private lateinit var drawerLayout: DrawerLayout
@@ -91,8 +101,7 @@ class MainActivity : BaseActivity() {
             txtUserName.text = currentUser.email ?: "Guest User"
             
             // Try to get name from Database
-            val databaseUrl = "https://aurexscannerapp-default-rtdb.firebaseio.com"
-            FirebaseDatabase.getInstance(databaseUrl).getReference("users").child(currentUser.uid)
+            FirebaseUtils.getDatabase().getReference("users").child(currentUser.uid)
                 .addListenerForSingleValueEvent(object : ValueEventListener {
                     override fun onDataChange(snapshot: DataSnapshot) {
                         if (snapshot.exists()) {
@@ -135,6 +144,8 @@ class MainActivity : BaseActivity() {
         findViewById<Button>(R.id.btnAdminHome).setOnClickListener {
             startActivity(Intent(this, AdminActivity::class.java))
         }
+
+        setupSearch()
         
         scheduleExpiryCheck()
         requestNotificationPermission()
@@ -148,13 +159,153 @@ class MainActivity : BaseActivity() {
         })
     }
 
+    private fun setupSearch() {
+        val searchView = findViewById<androidx.appcompat.widget.SearchView>(R.id.searchViewHome)
+        val rvResults = findViewById<RecyclerView>(R.id.rvHomeSearchResults)
+        val layoutContent = findViewById<View>(R.id.layoutHomeContent)
+        
+        rvResults.layoutManager = LinearLayoutManager(this)
+        
+        searchView.setOnQueryTextListener(object : androidx.appcompat.widget.SearchView.OnQueryTextListener {
+            override fun onQueryTextSubmit(query: String?): Boolean {
+                searchView.clearFocus()
+                return true
+            }
+
+            override fun onQueryTextChange(newText: String?): Boolean {
+                if (!newText.isNullOrBlank()) {
+                    layoutContent.visibility = View.GONE
+                    rvResults.visibility = View.VISIBLE
+                    loadHomeSearchResults(newText, rvResults)
+                } else {
+                    layoutContent.visibility = View.VISIBLE
+                    rvResults.visibility = View.GONE
+                }
+                return true
+            }
+        })
+    }
+
+    private fun loadHomeSearchResults(query: String, recyclerView: RecyclerView) {
+        val db = AppDatabase.getDatabase(this)
+        lifecycleScope.launch(Dispatchers.IO) {
+            val allData = db.productDao().getAllList()
+            val filtered = allData.filter {
+                it.name?.contains(query, ignoreCase = true) == true ||
+                it.productCode?.contains(query, ignoreCase = true) == true ||
+                it.category?.contains(query, ignoreCase = true) == true
+            }
+            
+            withContext(Dispatchers.Main) {
+                recyclerView.adapter = ProductAdapter(
+                    filtered,
+                    onClick = { product -> 
+                        val intent = Intent(this@MainActivity, ResultActivity::class.java)
+                        intent.putExtra("data", product)
+                        intent.putExtra("VIEW_ONLY", true)
+                        startActivity(intent)
+                    },
+                    onEdit = { product -> 
+                        val intent = Intent(this@MainActivity, ResultActivity::class.java)
+                        intent.putExtra("data", product)
+                        intent.putExtra("VIEW_ONLY", false)
+                        startActivity(intent)
+                    },
+                    onDelete = { _ -> }, // Disabled from home for safety
+                    onViewImage = { product -> showImageDialog(product) }
+                )
+            }
+        }
+    }
+
+    private fun showImageDialog(product: com.aurex.scanner.data.Product) {
+        val path = product.imagePath
+        if (path == null) {
+            Toast.makeText(this, "No image available", Toast.LENGTH_SHORT).show()
+            return
+        }
+        
+        val file = File(path)
+        if (!file.exists()) {
+            Toast.makeText(this, "Image file not found", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val dialog = android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
+        val photoView = PhotoView(this)
+        photoView.setBackgroundColor(Color.BLACK)
+        photoView.layoutParams = ViewGroup.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.MATCH_PARENT
+        )
+        dialog.setContentView(photoView)
+
+        Glide.with(this)
+            .asBitmap()
+            .load(file)
+            .into(object : com.bumptech.glide.request.target.CustomTarget<Bitmap>() {
+                override fun onResourceReady(resource: Bitmap, transition: com.bumptech.glide.request.transition.Transition<in Bitmap>?) {
+                    val highlightedBitmap = highlightDatesOnBitmap(resource, product)
+                    photoView.setImageBitmap(highlightedBitmap)
+                }
+                override fun onLoadCleared(placeholder: android.graphics.drawable.Drawable?) {}
+                override fun onLoadFailed(errorDrawable: android.graphics.drawable.Drawable?) {
+                    Toast.makeText(this@MainActivity, "Failed to load image", Toast.LENGTH_SHORT).show()
+                    dialog.dismiss()
+                }
+            })
+
+        photoView.setOnClickListener { dialog.dismiss() }
+        dialog.show()
+    }
+
+    private fun highlightDatesOnBitmap(original: Bitmap, product: com.aurex.scanner.data.Product): Bitmap {
+        val bitmap = original.copy(Bitmap.Config.ARGB_8888, true)
+        val canvas = Canvas(bitmap)
+        
+        val mfgPaint = Paint().apply {
+            color = Color.GREEN
+            style = Paint.Style.STROKE
+            strokeWidth = 8f
+            alpha = 150
+        }
+        
+        val expPaint = Paint().apply {
+            color = Color.RED
+            style = Paint.Style.STROKE
+            strokeWidth = 8f
+            alpha = 150
+        }
+
+        fun drawBox(boxStr: String?, paint: Paint) {
+            boxStr?.split(",")?.takeIf { it.size == 4 }?.let { parts ->
+                val left = parts[0].toFloat()
+                val top = parts[1].toFloat()
+                val right = parts[2].toFloat()
+                val bottom = parts[3].toFloat()
+                canvas.drawRect(left, top, right, bottom, paint)
+                
+                val labelPaint = Paint().apply {
+                    color = paint.color
+                    textSize = 50f
+                    typeface = Typeface.DEFAULT_BOLD
+                }
+                canvas.drawText(if (paint.color == Color.GREEN) "MFG" else "EXP", left, top - 10f, labelPaint)
+            }
+        }
+
+        drawBox(product.mfgBox, mfgPaint)
+        drawBox(product.expBox, expPaint)
+        
+        return bitmap
+    }
+
     private fun setupAdminNotificationEngine() {
         val prefs = getSharedPreferences("AurexPrefs", MODE_PRIVATE)
         val isAdmin = prefs.getBoolean("isAdmin", false)
         if (!isAdmin) return
 
-        val databaseUrl = "https://aurexscannerapp-default-rtdb.firebaseio.com"
-        val adminNotifRef = FirebaseDatabase.getInstance(databaseUrl).getReference("notifications").child("admin")
+        val adminNotifRef = FirebaseUtils.getDatabase().getReference("notifications").child("admin")
         
         // Remove existing listener if any
         adminNotifListener?.let { adminNotifRef.removeEventListener(it) }
@@ -193,9 +344,8 @@ class MainActivity : BaseActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        val databaseUrl = "https://aurexscannerapp-default-rtdb.firebaseio.com"
         adminNotifListener?.let {
-            FirebaseDatabase.getInstance(databaseUrl).getReference("notifications").child("admin").removeEventListener(it)
+            FirebaseUtils.getDatabase().getReference("notifications").child("admin").removeEventListener(it)
         }
     }
 
@@ -213,22 +363,25 @@ class MainActivity : BaseActivity() {
     private fun checkAndSyncStatus() {
         val user = FirebaseAuth.getInstance().currentUser ?: return
         val userId = user.uid
-        val firestore = FirebaseUtils.getFirestore()
-        val productsCollection = firestore.collection("backups").document(userId).collection("products")
+        val rtdb = FirebaseUtils.getDatabase()
+        val userRef = rtdb.getReference("users").child(userId).child("products")
         val db = AppDatabase.getDatabase(this)
 
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                // Fetch all product codes from server with longer timeout
+                // Fetch all products from RTDB
                 val snapshot = try {
-                    Tasks.await(productsCollection.get(), 60, TimeUnit.SECONDS)
+                    Tasks.await(userRef.get(), 30, TimeUnit.SECONDS)
                 } catch (e: Exception) {
-                    Log.e("Sync", "Initial sync fetch timed out", e)
+                    Log.e("Sync", "Initial RTDB sync fetch timed out", e)
                     null
                 }
 
-                if (snapshot != null && !snapshot.isEmpty) {
-                    val serverProductCodes = snapshot.documents.mapNotNull { it.id }.toSet()
+                if (snapshot != null && snapshot.exists()) {
+                    val serverProductCodes = snapshot.children.mapNotNull { 
+                        it.getValue(com.aurex.scanner.data.Product::class.java)?.productCode 
+                    }.toSet()
+                    
                     val localProducts = db.productDao().getAllList()
                     
                     val productsToUpdate = mutableListOf<com.aurex.scanner.data.Product>()
@@ -244,12 +397,12 @@ class MainActivity : BaseActivity() {
                     if (productsToUpdate.isNotEmpty()) {
                         db.productDao().updateAll(productsToUpdate)
                         withContext(Dispatchers.Main) {
-                            Log.d("Sync", "Updated ${productsToUpdate.size} products sync status")
+                            Log.d("Sync", "Updated ${productsToUpdate.size} products sync status from RTDB")
                         }
                     }
                 }
             } catch (e: Exception) {
-                Log.e("Sync", "Background sync check failed", e)
+                Log.e("Sync", "Background RTDB sync check failed", e)
             }
         }
     }
@@ -314,8 +467,7 @@ class MainActivity : BaseActivity() {
 
         // Verify with Realtime Database for latest status
         if (userId.isNotEmpty()) {
-            val databaseUrl = "https://aurexscannerapp-default-rtdb.firebaseio.com"
-            FirebaseDatabase.getInstance(databaseUrl).getReference("users").child(userId)
+            FirebaseUtils.getDatabase().getReference("users").child(userId)
                 .addListenerForSingleValueEvent(object : ValueEventListener {
                     override fun onDataChange(snapshot: DataSnapshot) {
                         val user = snapshot.getValue(com.aurex.scanner.data.User::class.java)
@@ -382,137 +534,40 @@ class MainActivity : BaseActivity() {
             return
         }
 
-        val userId = user.uid
-        val firestore = FirebaseUtils.getFirestore()
-        val productsCollection = firestore.collection("backups").document(userId).collection("products")
+        val dialogView = layoutInflater.inflate(R.layout.dialog_premium_progress, null)
+        val progressBar = dialogView.findViewById<com.google.android.material.progressindicator.LinearProgressIndicator>(R.id.progressBar)
+        val txtStatus = dialogView.findViewById<android.widget.TextView>(R.id.txtDialogStatus)
+        val txtFraction = dialogView.findViewById<android.widget.TextView>(R.id.txtProgressFraction)
+        val btnBackground = dialogView.findViewById<com.google.android.material.button.MaterialButton>(R.id.btnBackground)
+        val btnCancel = dialogView.findViewById<com.google.android.material.button.MaterialButton>(R.id.btnCancel)
 
-        val db = AppDatabase.getDatabase(this)
-        
+        val dialog = AlertDialog.Builder(this, R.style.PremiumGlassyDialog)
+            .setView(dialogView)
+            .setCancelable(false)
+            .create()
+        dialog.show()
+
+        btnBackground.setOnClickListener { dialog.dismiss() }
+
         syncJob = CoroutineScope(Dispatchers.Main).launch {
-            val progressDialog = AlertDialog.Builder(this@MainActivity, R.style.PremiumGlassyDialog)
-                .setTitle(R.string.syncing_data)
-                .setMessage(getString(R.string.preparing_backup))
-                .setCancelable(false)
-                .setNegativeButton(R.string.cancel) { _, _ ->
-                    syncJob?.cancel()
-                    Toast.makeText(this@MainActivity, R.string.sync_cancelled, Toast.LENGTH_SHORT).show()
-                }
-                .setNeutralButton(R.string.run_in_background) { dialog, _ ->
-                    dialog.dismiss()
-                    Toast.makeText(this@MainActivity, R.string.syncing_data, Toast.LENGTH_SHORT).show()
-                }
-                .create()
-            progressDialog.show()
-
-            try {
-                val localProducts = withContext(Dispatchers.IO) { db.productDao().getAllList() }
-                
-                if (localProducts.isEmpty()) {
-                    if (progressDialog.isShowing) progressDialog.dismiss()
-                    Toast.makeText(this@MainActivity, R.string.no_local_data, Toast.LENGTH_SHORT).show()
-                    return@launch
-                }
-
-                // Smart Check: Get existing codes from server to avoid unnecessary uploads
-                if (progressDialog.isShowing) {
-                    progressDialog.setMessage(getString(R.string.checking_server))
-                }
-                val existingCodes = withContext(Dispatchers.IO) {
-                    try {
-                        val snapshot = Tasks.await(productsCollection.get(), 30, TimeUnit.SECONDS)
-                        snapshot.documents.map { it.id }.toSet()
-                    } catch (e: Exception) {
-                        Log.e("Backup", "Failed to fetch existing codes", e)
-                        emptySet<String>()
-                    }
-                }
-
-                val totalCount = localProducts.size
-                var uploadedCount = 0
-                var skippedCount = 0
-                var hasError = false
-
-                for (product in localProducts) {
-                    if (syncJob?.isCancelled == true) break
-                    
-                    if (existingCodes.contains(product.productCode)) {
-                        skippedCount++
-                        withContext(Dispatchers.IO) {
-                            if (!product.isSynced) {
-                                product.isSynced = true
-                                db.productDao().update(product)
-                            }
-                        }
-                        continue
-                    }
-
-                    if (progressDialog.isShowing) {
-                        withContext(Dispatchers.Main) {
-                            progressDialog.setMessage(getString(R.string.backing_up_product, product.name, uploadedCount + skippedCount + 1, totalCount))
-                        }
-                    }
-
-                    val success = withContext(Dispatchers.IO) {
-                        try {
-                            // Using Firestore set() with merge for reliable updates
-                            Tasks.await(productsCollection.document(product.productCode).set(product, SetOptions.merge()), 30, TimeUnit.SECONDS)
-                            true
-                        } catch (e: Exception) {
-                            Log.e("Backup", "Failed to backup ${product.productCode}", e)
-                            false
-                        }
-                    }
-
-                    if (success) {
-                        uploadedCount++
-                        withContext(Dispatchers.IO) {
-                            product.isSynced = true
-                            db.productDao().update(product)
-                        }
-                        NotificationHelper.showProgressNotification(
-                            this@MainActivity,
-                            getString(R.string.cloud_backup),
-                            getString(R.string.uploaded_items, uploadedCount + skippedCount, totalCount),
-                            uploadedCount + skippedCount,
-                            totalCount,
-                            false
-                        )
-                    } else {
-                        hasError = true
-                    }
-                }
-
-                if (progressDialog.isShowing) progressDialog.dismiss()
-                NotificationHelper.cancelNotification(this@MainActivity)
-
-                val summaryMsg = StringBuilder()
-                if (uploadedCount > 0) summaryMsg.append(getString(R.string.backup_success_msg, uploadedCount))
-                if (skippedCount > 0) {
-                    if (summaryMsg.isNotEmpty()) summaryMsg.append("\n")
-                    summaryMsg.append(getString(R.string.duplicate_skipped) + ": $skippedCount")
-                }
-                if (hasError) {
-                    if (summaryMsg.isNotEmpty()) summaryMsg.append("\n")
-                    summaryMsg.append("Some items failed to upload.")
-                }
-
-                if (uploadedCount > 0 || skippedCount > 0) {
-                    AlertDialog.Builder(this@MainActivity)
-                        .setTitle(R.string.backup_success_title)
-                        .setMessage(summaryMsg.toString())
-                        .setPositiveButton(R.string.ok, null)
-                        .show()
-                } else if (!hasError) {
-                    Toast.makeText(this@MainActivity, R.string.duplicate_skipped, Toast.LENGTH_SHORT).show()
+            FirebaseUtils.backupToRTDB(this@MainActivity) { current, total, name ->
+                if (current == 0) {
+                    progressBar.isIndeterminate = true
+                    txtStatus.text = getString(R.string.uploading_items_count, total)
                 } else {
-                    Toast.makeText(this@MainActivity, R.string.backup_failed, Toast.LENGTH_LONG).show()
+                    progressBar.isIndeterminate = false
+                    progressBar.max = total
+                    progressBar.progress = current
+                    txtStatus.text = getString(R.string.backing_up_product, name, current, total)
                 }
-
-            } catch (e: Exception) {
-                if (progressDialog.isShowing) progressDialog.dismiss()
-                Log.e("Backup", "General Error", e)
-                Toast.makeText(this@MainActivity, "Error: ${e.message}", Toast.LENGTH_LONG).show()
+                txtFraction.text = getString(R.string.sync_progress_status, current, total)
             }
+            dialog.dismiss()
+        }
+        
+        btnCancel.setOnClickListener {
+            syncJob?.cancel()
+            dialog.dismiss()
         }
     }
 
@@ -534,143 +589,37 @@ class MainActivity : BaseActivity() {
     }
 
     private fun performActualRestore(userId: String) {
-        val firestore = FirebaseUtils.getFirestore()
-        val productsCollection = firestore.collection("backups").document(userId).collection("products")
-        val db = AppDatabase.getDatabase(this)
+        val dialogView = layoutInflater.inflate(R.layout.dialog_premium_progress, null)
+        val progressBar = dialogView.findViewById<com.google.android.material.progressindicator.LinearProgressIndicator>(R.id.progressBar)
+        val txtStatus = dialogView.findViewById<android.widget.TextView>(R.id.txtDialogStatus)
+        val txtFraction = dialogView.findViewById<android.widget.TextView>(R.id.txtProgressFraction)
+        val btnBackground = dialogView.findViewById<com.google.android.material.button.MaterialButton>(R.id.btnBackground)
+        val btnCancel = dialogView.findViewById<com.google.android.material.button.MaterialButton>(R.id.btnCancel)
+        
+        dialogView.findViewById<android.widget.TextView>(R.id.txtDialogTitle).text = getString(R.string.restoring_data)
 
-        val progressDialog = AlertDialog.Builder(this, R.style.PremiumGlassyDialog)
-            .setTitle(R.string.syncing_data)
-            .setMessage(getString(R.string.fetching_from_firestore))
+        val dialog = AlertDialog.Builder(this, R.style.PremiumGlassyDialog)
+            .setView(dialogView)
             .setCancelable(false)
-            .setNegativeButton(R.string.cancel) { _, _ ->
-                syncJob?.cancel()
-            }
-            .setNeutralButton(R.string.run_in_background) { dialog, _ ->
-                dialog.dismiss()
-                Toast.makeText(this@MainActivity, R.string.syncing_data, Toast.LENGTH_SHORT).show()
-            }
             .create()
-        progressDialog.show()
+        dialog.show()
+
+        btnBackground.setOnClickListener { dialog.dismiss() }
 
         syncJob = CoroutineScope(Dispatchers.Main).launch {
-            try {
-                val querySnapshot = withContext(Dispatchers.IO) {
-                    try {
-                        Tasks.await(productsCollection.get(), 60, TimeUnit.SECONDS)
-                    } catch (e: Exception) {
-                        Log.e("Restore", "Firestore fetch failed", e)
-                        null
-                    }
-                }
-
-                if (querySnapshot == null || querySnapshot.isEmpty) {
-                    // FALLBACK: Check old Realtime Database if Firestore is empty
-                    if (progressDialog.isShowing) {
-                        withContext(Dispatchers.Main) {
-                            progressDialog.setMessage(getString(R.string.checking_legacy_server))
-                        }
-                    }
-                    val databaseUrl = "https://aurexscannerapp-default-rtdb.firebaseio.com"
-                    val rtdbRef = FirebaseDatabase.getInstance(databaseUrl).getReference("products").child(userId)
-                    val rtdbSnapshot = withContext(Dispatchers.IO) {
-                        try {
-                            Tasks.await(rtdbRef.get(), 30, TimeUnit.SECONDS)
-                        } catch (e: Exception) {
-                            null
-                        }
-                    }
-
-                    if (rtdbSnapshot == null || !rtdbSnapshot.exists()) {
-                        if (progressDialog.isShowing) progressDialog.dismiss()
-                        Toast.makeText(this@MainActivity, R.string.no_backup_found, Toast.LENGTH_LONG).show()
-                        return@launch
-                    }
-
-                    // Process RTDB data
-                    val products = mutableListOf<com.aurex.scanner.data.Product>()
-                    for (child in rtdbSnapshot.children) {
-                        try {
-                            child.getValue(com.aurex.scanner.data.Product::class.java)?.let { product ->
-                                if (product.productCode.isEmpty()) product.productCode = child.key ?: ""
-                                product.isSynced = true
-                                products.add(product)
-                            }
-                        } catch (e: Exception) {
-                            Log.e("Restore", "Error parsing legacy product", e)
-                        }
-                    }
-                    
-                    if (products.isNotEmpty()) {
-                        withContext(Dispatchers.IO) {
-                            db.productDao().deleteAll()
-                            db.productDao().insertAll(products)
-                        }
-                        if (progressDialog.isShowing) progressDialog.dismiss()
-                        AlertDialog.Builder(this@MainActivity)
-                            .setTitle(R.string.legacy_restore_complete_title)
-                            .setMessage(getString(R.string.legacy_restore_complete_msg, products.size))
-                            .setPositiveButton(R.string.ok, null)
-                            .show()
-                        return@launch
-                    }
-                }
-
-                val products = mutableListOf<com.aurex.scanner.data.Product>()
-                val documents = querySnapshot?.documents ?: emptyList()
-                val totalItems = documents.size
-                var processedItems = 0
-
-                for (doc in documents) {
-                    if (syncJob?.isCancelled == true) break
-                    
-                    doc.toObject(com.aurex.scanner.data.Product::class.java)?.let { product ->
-                        product.isSynced = true
-                        products.add(product)
-                    }
-                    
-                    processedItems++
-                    if (progressDialog.isShowing) {
-                        withContext(Dispatchers.Main) {
-                            progressDialog.setMessage(getString(R.string.restoring_product, processedItems, totalItems))
-                        }
-                    }
-                    NotificationHelper.showProgressNotification(
-                        this@MainActivity,
-                        getString(R.string.cloud_restore),
-                        getString(R.string.downloading_items, processedItems, totalItems),
-                        processedItems,
-                        totalItems,
-                        false
-                    )
-                }
-
-                if (syncJob?.isCancelled == true) {
-                    if (progressDialog.isShowing) progressDialog.dismiss()
-                    NotificationHelper.cancelNotification(this@MainActivity)
-                    return@launch
-                }
-
-                if (products.isNotEmpty()) {
-                    withContext(Dispatchers.IO) {
-                        db.productDao().deleteAll()
-                        db.productDao().insertAll(products)
-                    }
-                    
-                    if (progressDialog.isShowing) progressDialog.dismiss()
-                    NotificationHelper.cancelNotification(this@MainActivity)
-                    AlertDialog.Builder(this@MainActivity)
-                        .setTitle(R.string.restore_complete_title)
-                        .setMessage(getString(R.string.restore_complete_msg, products.size))
-                        .setPositiveButton(R.string.ok, null)
-                        .show()
-                }
-
-            } catch (e: Exception) {
-                if (progressDialog.isShowing) progressDialog.dismiss()
-                NotificationHelper.cancelNotification(this@MainActivity)
-                Log.e("Restore", "Error during restore", e)
-                Toast.makeText(this@MainActivity, getString(R.string.restore_failed, e.message), Toast.LENGTH_LONG).show()
+            FirebaseUtils.restoreFromRTDB(this@MainActivity) { current, total, name ->
+                progressBar.isIndeterminate = false
+                progressBar.max = total
+                progressBar.progress = current
+                txtStatus.text = getString(R.string.restoring_product_status, name)
+                txtFraction.text = getString(R.string.sync_progress_status, current, total)
             }
+            dialog.dismiss()
+        }
+        
+        btnCancel.setOnClickListener {
+            syncJob?.cancel()
+            dialog.dismiss()
         }
     }
 

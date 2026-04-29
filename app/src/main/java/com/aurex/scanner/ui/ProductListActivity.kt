@@ -28,7 +28,9 @@ import kotlinx.coroutines.withContext
 class ProductListActivity : BaseActivity() {
 
     private lateinit var recyclerView: RecyclerView
+    private lateinit var searchView: androidx.appcompat.widget.SearchView
     private var currentSort = "id"
+    private var searchQuery: String? = null
     private var activeCodeEditText: EditText? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -37,6 +39,27 @@ class ProductListActivity : BaseActivity() {
 
         recyclerView = findViewById(R.id.recyclerView)
         recyclerView.layoutManager = LinearLayoutManager(this)
+
+        searchView = findViewById(R.id.searchViewList)
+        searchQuery = intent.getStringExtra("SEARCH_QUERY")
+        if (!searchQuery.isNullOrBlank()) {
+            searchView.setQuery(searchQuery, false)
+        }
+
+        searchView.setOnQueryTextListener(object : androidx.appcompat.widget.SearchView.OnQueryTextListener {
+            override fun onQueryTextSubmit(query: String?): Boolean {
+                searchQuery = query
+                loadProducts()
+                searchView.clearFocus()
+                return true
+            }
+
+            override fun onQueryTextChange(newText: String?): Boolean {
+                searchQuery = newText
+                loadProducts()
+                return true
+            }
+        })
 
         val filterType = intent.getStringExtra("FILTER_TYPE")
         if (filterType == "near_expiry") {
@@ -92,18 +115,29 @@ class ProductListActivity : BaseActivity() {
         lifecycleScope.launch(Dispatchers.IO) {
             var allData = db.productDao().getAllList()
             
+            // Apply Search Filter
+            val filteredData = if (!searchQuery.isNullOrBlank()) {
+                allData.filter { product ->
+                    (product.name?.contains(searchQuery!!, ignoreCase = true) == true) ||
+                    (product.productCode?.contains(searchQuery!!, ignoreCase = true) == true) ||
+                    (product.category?.contains(searchQuery!!, ignoreCase = true) == true)
+                }
+            } else {
+                allData
+            }
+
             val sortedData = when {
                 currentSort.startsWith("category_") -> {
                     val filter = currentSort.removePrefix("category_")
-                    allData.filter { it.category == filter }
+                    filteredData.filter { it.category == filter }
                 }
                 currentSort.startsWith("warehouse_") -> {
                     val filter = currentSort.removePrefix("warehouse_")
-                    allData.filter { it.warehouseName == filter }
+                    filteredData.filter { it.warehouseName == filter }
                 }
-                currentSort == "expiry" -> allData.sortedBy { TextParser.convertToSortable(it.expDate ?: "99/99/9999") }
-                currentSort == "near_expiry" -> allData.filter { TextParser.isNearExpiry(it.expDate) }
-                else -> allData.sortedByDescending { it.id }
+                currentSort == "expiry" -> filteredData.sortedBy { TextParser.convertToSortable(it.expDate ?: "99/99/9999") }
+                currentSort == "near_expiry" -> filteredData.filter { TextParser.isNearExpiry(it.expDate) }
+                else -> filteredData.sortedByDescending { it.id }
             }
 
             // After sorting/filtering, convert to list if needed

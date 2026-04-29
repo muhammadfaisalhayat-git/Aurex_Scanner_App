@@ -4,6 +4,17 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
+    <androidx.appcompat.widget.SearchView
+        android:id="@+id/searchViewList"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:background="#FFFFFF"
+        app:iconifiedByDefault="false"
+        app:queryHint="@string/search_hint"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
     <LinearLayout
         android:id="@+id/sortContainer"
         android:layout_width="match_parent"
@@ -11,7 +22,7 @@
         android:orientation="horizontal"
         android:padding="8dp"
         android:background="#F5F5F5"
-        app:layout_constraintTop_toTopOf="parent">
+        app:layout_constraintTop_toBottomOf="@id/searchViewList">
 
         <TextView
             android:layout_width="wrap_content"

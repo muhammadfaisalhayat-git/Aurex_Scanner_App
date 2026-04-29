@@ -331,39 +331,49 @@ class AdminActivity : BaseActivity() {
             allAdminProducts = db.productDao().getAllList()
             updateDashboardUI()
 
-            // Fetch remote data from unified Firestore 'products' collections
-            val firestore = FirebaseUtils.getFirestore()
-            firestore.collectionGroup("products").get().addOnSuccessListener { snapshot ->
-                lifecycleScope.launch(Dispatchers.Default) {
-                    val remoteProducts = mutableListOf<Product>()
-                    for (doc in snapshot.documents) {
-                        try {
-                            val product = doc.toObject(Product::class.java)
-                            if (product != null) {
-                                if (product.productCode.isEmpty()) product.productCode = doc.id
-                                product.isSynced = true
-                                remoteProducts.add(product)
+            // Fetch remote data from all users in RTDB
+            val usersRef = FirebaseUtils.getDatabase().getReference("users")
+            usersRef.addListenerForSingleValueEvent(object : ValueEventListener {
+                override fun onDataChange(snapshot: DataSnapshot) {
+                    lifecycleScope.launch(Dispatchers.Default) {
+                        val remoteProducts = mutableListOf<Product>()
+                        for (userSnapshot in snapshot.children) {
+                            val productsSnapshot = userSnapshot.child("products")
+                            if (productsSnapshot.exists()) {
+                                for (productSnapshot in productsSnapshot.children) {
+                                    try {
+                                        val product = productSnapshot.getValue(Product::class.java)
+                                        if (product != null) {
+                                            if (product.productCode.isEmpty()) product.productCode = productSnapshot.key ?: ""
+                                            product.isSynced = true
+                                            remoteProducts.add(product)
+                                        }
+                                    } catch (e: Exception) {
+                                        android.util.Log.e("AdminActivity", "Error parsing product", e)
+                                    }
+                                }
                             }
-                        } catch (e: Exception) {
-                            android.util.Log.e("AdminActivity", "Error parsing product", e)
                         }
-                    }
-                    
-                    if (remoteProducts.isNotEmpty()) {
-                        allAdminProducts = remoteProducts
-                        withContext(Dispatchers.Main) {
-                            updateDashboardUI()
-                            swipeRefresh.isRefreshing = false
-                        }
-                    } else {
-                        withContext(Dispatchers.Main) {
-                            swipeRefresh.isRefreshing = false
+                        
+                        if (remoteProducts.isNotEmpty()) {
+                            allAdminProducts = remoteProducts
+                            withContext(Dispatchers.Main) {
+                                updateDashboardUI()
+                                swipeRefresh.isRefreshing = false
+                            }
+                        } else {
+                            withContext(Dispatchers.Main) {
+                                updateDashboardUI() // Still update to show local if no remote
+                                swipeRefresh.isRefreshing = false
+                            }
                         }
                     }
                 }
-            }.addOnFailureListener {
-                swipeRefresh.isRefreshing = false
-            }
+
+                override fun onCancelled(error: DatabaseError) {
+                    swipeRefresh.isRefreshing = false
+                }
+            })
         }
     }
 

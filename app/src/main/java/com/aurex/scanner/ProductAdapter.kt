@@ -106,6 +106,15 @@ class ProductAdapter(
         holder.itemView.setOnClickListener { onClick(item) }
         
         holder.imgSynced.visibility = if (item.isSynced) View.VISIBLE else View.GONE
+        if (item.isSynced) {
+            val tintColor = when {
+                daysLeft == null -> Color.parseColor("#4CAF50") // Green for unknown (safe default)
+                daysLeft <= 0 -> Color.RED // Red for expired
+                daysLeft <= 30 -> Color.parseColor("#FFD700") // Yellow/Gold for near expiry
+                else -> Color.parseColor("#4CAF50") // Green for valid
+            }
+            holder.imgSynced.setColorFilter(tintColor)
+        }
         
         holder.itemView.setOnLongClickListener {
             onDelete(item)

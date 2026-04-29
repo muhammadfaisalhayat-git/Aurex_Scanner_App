@@ -180,6 +180,24 @@
             app:iconSize="24dp"
             android:layout_marginBottom="8dp" />
 
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnBackupCloud"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="match_parent"
+            android:layout_height="64dp"
+            android:text="Backup to Cloud (RTDB)"
+            app:icon="@android:drawable/ic_menu_upload"
+            android:layout_marginBottom="8dp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnRestoreCloud"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="match_parent"
+            android:layout_height="64dp"
+            android:text="Restore from Cloud (RTDB)"
+            app:icon="@android:drawable/ic_menu_revert"
+            android:layout_marginBottom="8dp" />
+
         <View
             android:id="@+id/adminDivider"
             android:layout_width="match_parent"

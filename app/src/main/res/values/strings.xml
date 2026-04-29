@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Bin Awf Agricultural</string>
+    <string name="app_name">Aurex Scanner</string>
     <string name="project_of_aurex_erp">A Project of Aurex ERP</string>
     <string name="power_your_business_growth">Bin Awf Agricultural</string>
     <string name="navigation_drawer_open">Open navigation drawer</string>
@@ -149,23 +149,23 @@
     <string name="edit">EDIT</string>
     <string name="update_product">UPDATE PRODUCT</string>
     <string name="restore_from_cloud_title">Restore from Cloud</string>
-    <string name="restore_from_cloud_msg">This will download all your products from Firestore and replace your local list. Continue?</string>
-    <string name="legacy_restore_complete_title">Legacy Restore Complete</string>
-    <string name="legacy_restore_complete_msg">Successfully restored %1$d products from the legacy server.\n\nTip: Use \'Backup to Server\' now to migrate this data to the new cloud system.</string>
-    <string name="no_backup_found">No backup found on any server.</string>
-    <string name="checking_legacy_server">Checking legacy server...</string>
+    <string name="restore_from_cloud_msg">This will download all your products from the server and replace your local list. Continue?</string>
+    <string name="legacy_restore_complete_title">Restore Complete</string>
+    <string name="legacy_restore_complete_msg">Successfully restored %1$d products.</string>
+    <string name="no_backup_found">No backup found on the server.</string>
+    <string name="checking_legacy_server">Checking legacy data...</string>
     <string name="preparing_backup">Preparing backup...</string>
     <string name="sync_cancelled">Sync Cancelled</string>
     <string name="run_in_background">Run in Background</string>
     <string name="no_local_data">No local data to backup.</string>
-    <string name="uploading_to_firestore">Uploading %1$d products to Firestore...</string>
+    <string name="uploading_to_firestore">Uploading %1$d products to server...</string>
     <string name="backing_up_product">Backing up: %1$s (%2$d/%3$d)...</string>
     <string name="cloud_backup">Cloud Backup</string>
     <string name="uploaded_items">Uploaded %1$d of %2$d items...</string>
     <string name="backup_success_title">Backup Successful</string>
-    <string name="backup_success_msg">Successfully backed up %1$d products to Firestore.</string>
+    <string name="backup_success_msg">Successfully backed up %1$d products to the server.</string>
     <string name="backup_failed">Backup failed. Check connection.</string>
-    <string name="fetching_from_firestore">Fetching from Firestore...</string>
+    <string name="fetching_from_firestore">Fetching from server...</string>
     <string name="restoring_product">Restoring %1$d/%2$d...</string>
     <string name="cloud_restore">Cloud Restore</string>
     <string name="downloading_items">Downloading %1$d of %2$d items...</string>
@@ -176,4 +176,12 @@
     <string name="wipe_cloud_backups_title">Wipe Cloud Backups</string>
     <string name="wipe_cloud_backups_msg">Are you sure you want to delete your Cloud Backups from Firestore?</string>
     <string name="cloud_backups_deleted">Cloud backups deleted</string>
+    <string name="processing_image">Please wait the picture is processing...</string>
+    <string name="sync_progress_status">Processed: %1$d / %2$d</string>
+    <string name="restoring_data">Restoring data...</string>
+    <string name="backing_up_data">Backing up data...</string>
+    <string name="restoring_product_status">Restoring: %1$s</string>
+    <string name="uploading_items_count">Uploading: %1$d items...</string>
+    <string name="sync_complete_status">Sync Complete!</string>
+    <string name="search_hint">Search name, date, category...</string>
 </resources>

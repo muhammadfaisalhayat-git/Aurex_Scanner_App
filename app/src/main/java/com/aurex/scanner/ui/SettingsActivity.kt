@@ -9,11 +9,14 @@ import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.appcompat.widget.SwitchCompat
+import androidx.lifecycle.lifecycleScope
 import com.aurex.scanner.R
+import com.aurex.scanner.util.FirebaseUtils
 import com.google.android.material.button.MaterialButton
 import com.google.firebase.auth.EmailAuthProvider
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.FirebaseDatabase
+import kotlinx.coroutines.launch
 
 class SettingsActivity : BaseActivity() {
 
@@ -87,28 +90,125 @@ class SettingsActivity : BaseActivity() {
         findViewById<MaterialButton>(R.id.btnCleanFirestore).setOnClickListener {
             confirmWipeFirestoreData()
         }
+
+        findViewById<MaterialButton>(R.id.btnBackupCloud).setOnClickListener {
+            backupData()
+        }
+
+        findViewById<MaterialButton>(R.id.btnRestoreCloud).setOnClickListener {
+            restoreData()
+        }
+    }
+
+    private fun backupData() {
+        val dialogView = layoutInflater.inflate(R.layout.dialog_premium_progress, null)
+        val progressBar = dialogView.findViewById<com.google.android.material.progressindicator.LinearProgressIndicator>(R.id.progressBar)
+        val txtStatus = dialogView.findViewById<TextView>(R.id.txtDialogStatus)
+        val txtFraction = dialogView.findViewById<TextView>(R.id.txtProgressFraction)
+        val btnBackground = dialogView.findViewById<com.google.android.material.button.MaterialButton>(R.id.btnBackground)
+        val btnCancel = dialogView.findViewById<com.google.android.material.button.MaterialButton>(R.id.btnCancel)
+
+        val dialog = AlertDialog.Builder(this, R.style.PremiumGlassyDialog)
+            .setView(dialogView)
+            .setCancelable(false)
+            .create()
+            
+        dialog.show()
+        
+        btnBackground.setOnClickListener { dialog.dismiss() }
+        
+        val job = lifecycleScope.launch {
+            FirebaseUtils.backupToRTDB(this@SettingsActivity) { current, total, _ ->
+                if (current == 0) {
+                    progressBar.isIndeterminate = true
+                    txtStatus.text = getString(R.string.uploading_items_count, total)
+                } else {
+                    progressBar.isIndeterminate = false
+                    progressBar.max = total
+                    progressBar.progress = current
+                    txtStatus.text = getString(R.string.sync_complete_status)
+                }
+                txtFraction.text = getString(R.string.sync_progress_status, current, total)
+            }
+            dialog.dismiss()
+        }
+        
+        btnCancel.setOnClickListener {
+            job.cancel()
+            dialog.dismiss()
+        }
+    }
+
+    private fun restoreData() {
+        AlertDialog.Builder(this)
+            .setTitle(R.string.restore_from_cloud_title)
+            .setMessage(R.string.restore_from_cloud_msg)
+            .setPositiveButton(R.string.restore) { _, _ ->
+                val dialogView = layoutInflater.inflate(R.layout.dialog_premium_progress, null)
+                val progressBar = dialogView.findViewById<com.google.android.material.progressindicator.LinearProgressIndicator>(R.id.progressBar)
+                val txtStatus = dialogView.findViewById<TextView>(R.id.txtDialogStatus)
+                val txtFraction = dialogView.findViewById<TextView>(R.id.txtProgressFraction)
+                val btnBackground = dialogView.findViewById<com.google.android.material.button.MaterialButton>(R.id.btnBackground)
+                val btnCancel = dialogView.findViewById<com.google.android.material.button.MaterialButton>(R.id.btnCancel)
+                
+                dialogView.findViewById<TextView>(R.id.txtDialogTitle).text = getString(R.string.restoring_data)
+                
+                val dialog = AlertDialog.Builder(this, R.style.PremiumGlassyDialog)
+                    .setView(dialogView)
+                    .setCancelable(false)
+                    .create()
+                
+                dialog.show()
+                
+                btnBackground.setOnClickListener { dialog.dismiss() }
+                
+                val job = lifecycleScope.launch {
+                    FirebaseUtils.restoreFromRTDB(this@SettingsActivity) { current, total, name ->
+                        progressBar.max = total
+                        progressBar.progress = current
+                        txtStatus.text = getString(R.string.restoring_product_status, name)
+                        txtFraction.text = getString(R.string.sync_progress_status, current, total)
+                    }
+                    dialog.dismiss()
+                }
+                
+                btnCancel.setOnClickListener {
+                    job.cancel()
+                    dialog.dismiss()
+                }
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
     }
 
     private fun confirmWipeFirestoreData() {
         AlertDialog.Builder(this)
-            .setTitle("Wipe Cloud Backups")
-            .setMessage("Are you sure you want to delete your Cloud Backups from Firestore?")
-            .setPositiveButton("Delete") { _, _ ->
+            .setTitle(R.string.wipe_cloud_backups_title)
+            .setMessage(R.string.wipe_cloud_backups_msg)
+            .setPositiveButton(R.string.delete) { _, _ ->
                 val user = FirebaseAuth.getInstance().currentUser ?: return@setPositiveButton
-                val firestore = com.aurex.scanner.util.FirebaseUtils.getFirestore()
+                
+                // 1. Wipe RTDB Backup
+                val databaseUrl = "https://aurexscannerapp-default-rtdb.firebaseio.com"
+                FirebaseDatabase.getInstance(databaseUrl).getReference("users").child(user.uid).child("products").removeValue()
+
+                // 2. Wipe Firestore Backup (Legacy)
+                val firestore = FirebaseUtils.getFirestore()
                 val productsCollection = firestore.collection("backups").document(user.uid).collection("products")
                 
                 productsCollection.get().addOnSuccessListener { snapshot ->
-                    val batch = firestore.batch()
-                    for (doc in snapshot.documents) {
-                        batch.delete(doc.reference)
-                    }
-                    batch.commit().addOnSuccessListener {
-                        Toast.makeText(this, "Cloud backups deleted", Toast.LENGTH_SHORT).show()
+                    if (!snapshot.isEmpty) {
+                        val batch = firestore.batch()
+                        for (doc in snapshot.documents) {
+                            batch.delete(doc.reference)
+                        }
+                        batch.commit()
                     }
                 }
+                
+                Toast.makeText(this, R.string.cloud_backups_deleted, Toast.LENGTH_SHORT).show()
             }
-            .setNegativeButton("Cancel", null)
+            .setNegativeButton(R.string.cancel, null)
             .show()
     }
 
