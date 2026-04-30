@@ -90,6 +90,11 @@ class ResultActivity : BaseActivity() {
 
         updateUI(product)
 
+        val toolbar = findViewById<androidx.appcompat.widget.Toolbar>(R.id.toolbar)
+        setSupportActionBar(toolbar)
+        supportActionBar?.setDisplayHomeAsUpEnabled(true)
+        supportActionBar?.setHomeAsUpIndicator(android.R.drawable.ic_menu_today)
+
         if (viewOnly) {
             layoutViewMode.visibility = View.VISIBLE
             layoutEditMode.visibility = View.GONE
@@ -183,6 +188,24 @@ class ResultActivity : BaseActivity() {
                 isSynced = false
             )
             checkDuplicateAndSave(finalProduct)
+        }
+    }
+
+    override fun onCreateOptionsMenu(menu: android.view.Menu): Boolean {
+        menuInflater.inflate(R.menu.top_menu, menu)
+        menu.findItem(R.id.action_home)?.isVisible = false
+        return true
+    }
+
+    override fun onOptionsItemSelected(item: android.view.MenuItem): Boolean {
+        return when (item.itemId) {
+            android.R.id.home -> {
+                val intent = android.content.Intent(this, MainActivity::class.java)
+                intent.flags = android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP or android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP
+                startActivity(intent)
+                true
+            }
+            else -> super.onOptionsItemSelected(item)
         }
     }
 
@@ -343,7 +366,12 @@ class ResultActivity : BaseActivity() {
                     }
 
                     // 1. Mobile Notification
-                    showMobileNotification(product.name, message, daysLeft <= 0)
+                    com.aurex.scanner.util.NotificationHelper.showSystemNotification(
+                        this@ResultActivity,
+                        if (daysLeft <= 0) getString(R.string.expiry_alert_title, product.name) else getString(R.string.near_expiry_title, product.name),
+                        message,
+                        product.name.hashCode()
+                    )
 
                     // 2. In-App Notification (Firebase)
                     val userId = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid
@@ -367,41 +395,6 @@ class ResultActivity : BaseActivity() {
             }
         } catch (e: Exception) {
             e.printStackTrace()
-        }
-    }
-
-    private fun showMobileNotification(name: String, message: String, isCritical: Boolean) {
-        val manager = getSystemService(android.content.Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
-        val channelId = if (isCritical) "expiry_critical" else "expiry_channel"
-
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-            val channel = android.app.NotificationChannel(
-                channelId,
-                if (isCritical) "Critical Expiry Alerts" else "Expiry Alerts",
-                if (isCritical) android.app.NotificationManager.IMPORTANCE_HIGH else android.app.NotificationManager.IMPORTANCE_DEFAULT
-            ).apply {
-                if (isCritical) {
-                    enableVibration(true)
-                    vibrationPattern = longArrayOf(0, 500, 200, 500)
-                }
-            }
-            manager.createNotificationChannel(channel)
-        }
-
-        val notification = androidx.core.app.NotificationCompat.Builder(this, channelId)
-            .setContentTitle(if (isCritical) "🚨 EXPIRED: $name" else "⚠️ Expiry Alert: $name")
-            .setContentText(message)
-            .setSmallIcon(android.R.drawable.ic_dialog_alert)
-            .setPriority(if (isCritical) androidx.core.app.NotificationCompat.PRIORITY_HIGH else androidx.core.app.NotificationCompat.PRIORITY_DEFAULT)
-            .setAutoCancel(true)
-            .build()
-
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-            if (androidx.core.content.ContextCompat.checkSelfPermission(this, android.Manifest.permission.POST_NOTIFICATIONS) == android.content.pm.PackageManager.PERMISSION_GRANTED) {
-                manager.notify(name.hashCode(), notification)
-            }
-        } else {
-            manager.notify(name.hashCode(), notification)
         }
     }
 

@@ -1,7 +1,7 @@
 <resources>
-    <string name="app_name">بن عوف الزراعية</string>
+    <string name="app_name">أوريكس سكانر</string>
     <string name="project_of_aurex_erp">مشروع من أوريكس ERP</string>
-    <string name="power_your_business_growth">بن عوف الزراعية</string>
+    <string name="power_your_business_growth">أوريكس سكانر</string>
     <string name="navigation_drawer_open">فتح قائمة التنقل</string>
     <string name="navigation_drawer_close">إغلاق قائمة التنقل</string>
 
@@ -22,6 +22,7 @@
     <string name="enable_biometric">تفعيل الدخول الحيوي</string>
     <string name="biometric_desc">استخدم بصمة الإصبع أو التعرف على الوجه للوصول بشكل أسرع.</string>
     <string name="welcome_to_aurex">بن عوف الزراعية</string>
+    <string name="admin_email">admin@aurex.com</string>
     <string name="open_menu_for_more">افتح القائمة الجانبية لمزيد من الخيارات</string>
     <string name="near_expiry_products">منتجات قريبة الانتهاء</string>
 

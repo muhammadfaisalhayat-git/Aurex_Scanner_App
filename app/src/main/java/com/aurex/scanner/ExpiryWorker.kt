@@ -1,6 +1,5 @@
 package com.aurex.scanner
 
-import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
@@ -56,7 +55,12 @@ class ExpiryWorker(
                         }
                         
                         // 1. Show Mobile Push Notification
-                        showMobileNotification(product.name, message, daysLeft <= 0)
+                        NotificationHelper.showSystemNotification(
+                            applicationContext,
+                            if (daysLeft <= 0) "🚨 EXPIRED: ${product.name}" else "⚠️ Expiry Alert: ${product.name}",
+                            message,
+                            product.name.hashCode()
+                        )
                         
                         // 2. Add to In-App Notification Feed (Firebase)
                         if (userId != null) {
@@ -82,41 +86,6 @@ class ExpiryWorker(
         }
 
         return Result.success()
-    }
-
-    private fun showMobileNotification(name: String, message: String, isCritical: Boolean) {
-        val manager = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        val channelId = if (isCritical) "expiry_critical" else "expiry_channel"
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                channelId,
-                if (isCritical) "Critical Expiry Alerts" else "Expiry Alerts",
-                if (isCritical) NotificationManager.IMPORTANCE_HIGH else NotificationManager.IMPORTANCE_DEFAULT
-            ).apply {
-                if (isCritical) {
-                    enableVibration(true)
-                    vibrationPattern = longArrayOf(0, 500, 200, 500)
-                }
-            }
-            manager.createNotificationChannel(channel)
-        }
-
-        val notification = NotificationCompat.Builder(applicationContext, channelId)
-            .setContentTitle(if (isCritical) "🚨 EXPIRED: $name" else "⚠️ Expiry Alert: $name")
-            .setContentText(message)
-            .setSmallIcon(android.R.drawable.ic_dialog_alert)
-            .setPriority(if (isCritical) NotificationCompat.PRIORITY_HIGH else NotificationCompat.PRIORITY_DEFAULT)
-            .setAutoCancel(true)
-            .build()
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(applicationContext, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) {
-                manager.notify(name.hashCode(), notification)
-            }
-        } else {
-            manager.notify(name.hashCode(), notification)
-        }
     }
 
     private fun triggerEmailAlert(productName: String, message: String, email: String?) {

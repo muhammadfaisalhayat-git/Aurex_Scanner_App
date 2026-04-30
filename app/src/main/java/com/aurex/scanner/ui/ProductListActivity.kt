@@ -24,6 +24,9 @@ import com.github.chrisbanes.photoview.PhotoView
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import android.view.Menu
+import android.view.MenuItem
+import androidx.appcompat.widget.Toolbar
 
 class ProductListActivity : BaseActivity() {
 
@@ -36,6 +39,11 @@ class ProductListActivity : BaseActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_product_list)
+
+        val toolbar = findViewById<Toolbar>(R.id.toolbar)
+        setSupportActionBar(toolbar)
+        supportActionBar?.setDisplayHomeAsUpEnabled(true)
+        supportActionBar?.setHomeAsUpIndicator(android.R.drawable.ic_menu_view) // Using a standard icon that's likely to exist or just leave default back if home fails
 
         recyclerView = findViewById(R.id.recyclerView)
         recyclerView.layoutManager = LinearLayoutManager(this)
@@ -55,8 +63,11 @@ class ProductListActivity : BaseActivity() {
             }
 
             override fun onQueryTextChange(newText: String?): Boolean {
-                searchQuery = newText
-                loadProducts()
+                // Only filter when hitting enter, or when clearing search
+                if (newText.isNullOrBlank()) {
+                    searchQuery = ""
+                    loadProducts()
+                }
                 return true
             }
         })
@@ -78,6 +89,29 @@ class ProductListActivity : BaseActivity() {
         }
 
         loadProducts()
+    }
+
+    override fun onCreateOptionsMenu(menu: Menu): Boolean {
+        menuInflater.inflate(R.menu.top_menu, menu)
+        // Hide the home action in menu if we use setDisplayHomeAsUpEnabled with home icon
+        menu.findItem(R.id.action_home)?.isVisible = false
+        return true
+    }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        return when (item.itemId) {
+            android.R.id.home -> {
+                val intent = android.content.Intent(this, MainActivity::class.java)
+                intent.flags = android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP or android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP
+                startActivity(intent)
+                true
+            }
+            R.id.action_notifications -> {
+                // Handle notifications or common logic
+                super.onOptionsItemSelected(item)
+            }
+            else -> super.onOptionsItemSelected(item)
+        }
     }
 
     private fun showFilterDialog(type: String) {

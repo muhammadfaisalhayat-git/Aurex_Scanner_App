@@ -43,6 +43,7 @@ class ScannerActivity : BaseActivity() {
     private lateinit var previewView: PreviewView
     private lateinit var captureBtn: ImageButton
     private lateinit var flashBtn: ImageButton
+    private lateinit var galleryBtn: ImageButton
     private lateinit var historyBtn: ImageButton
     private lateinit var camera: androidx.camera.core.Camera
     private lateinit var imageCapture: ImageCapture
@@ -85,6 +86,7 @@ class ScannerActivity : BaseActivity() {
         previewView = findViewById(R.id.previewView)
         captureBtn = findViewById(R.id.btnCapture)
         flashBtn = findViewById(R.id.btnFlash)
+        galleryBtn = findViewById(R.id.btnGallery)
         historyBtn = findViewById(R.id.btnHistory)
         overlay = findViewById(R.id.overlay)
         processingLayout = findViewById(R.id.processingLayout)
@@ -112,6 +114,7 @@ class ScannerActivity : BaseActivity() {
             takePhoto()
         }
         flashBtn.setOnClickListener { toggleFlash() }
+        galleryBtn.setOnClickListener { pickFromGallery() }
         historyBtn.setOnClickListener {
             startActivity(Intent(this, ProductListActivity::class.java))
         }
@@ -512,6 +515,56 @@ class ScannerActivity : BaseActivity() {
             flashBtn.setImageResource(
                 if (isFlashOn) R.drawable.ic_flash_on else R.drawable.ic_flash_off
             )
+        }
+    }
+
+    private fun pickFromGallery() {
+        val intent = Intent(Intent.ACTION_PICK)
+        intent.type = "image/*"
+        startActivityForResult(intent, 2001)
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (resultCode == RESULT_OK) {
+            when (requestCode) {
+                2001 -> {
+                    val selectedImageUri = data?.data ?: return
+                    handleGalleryImage(selectedImageUri)
+                }
+            }
+        }
+    }
+
+    private fun handleGalleryImage(uri: Uri) {
+        processingLayout.visibility = android.view.View.VISIBLE
+        controlsLayout.visibility = android.view.View.GONE
+
+        val photoFile = File(externalCacheDir, "gallery_pick.jpg")
+        
+        try {
+            contentResolver.openInputStream(uri)?.use { input ->
+                FileOutputStream(photoFile).use { output ->
+                    input.copyTo(output)
+                }
+            }
+            
+            // Fix rotation if needed (gallery images often have EXIF issues)
+            fixImageRotation(photoFile)
+            
+            val bitmap = BitmapFactory.decodeFile(photoFile.absolutePath)
+            if (bitmap != null) {
+                ivCapturedPreview.setImageBitmap(bitmap)
+                processingOverlay.setImageSize(bitmap.width, bitmap.height)
+                getDetectedTextBlocks(photoFile)
+            }
+            
+            processImage(photoFile)
+            
+        } catch (e: Exception) {
+            Log.e("ScannerActivity", "Error handling gallery image", e)
+            resetScannerUI()
+            Toast.makeText(this, "Failed to load image", Toast.LENGTH_SHORT).show()
         }
     }
 

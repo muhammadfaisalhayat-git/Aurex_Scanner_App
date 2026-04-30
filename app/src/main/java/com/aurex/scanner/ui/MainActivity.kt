@@ -65,6 +65,7 @@ import android.graphics.Typeface
 import android.view.ViewGroup
 import com.github.chrisbanes.photoview.PhotoView
 import com.bumptech.glide.Glide
+import android.widget.ScrollView
 import com.aurex.scanner.ProductAdapter
 
 class MainActivity : BaseActivity() {
@@ -72,6 +73,7 @@ class MainActivity : BaseActivity() {
     private lateinit var navView: NavigationView
     private var syncJob: Job? = null
     private var adminNotifListener: ValueEventListener? = null
+    private var userNotifListener: ValueEventListener? = null
 
     @androidx.annotation.OptIn(androidx.camera.core.ExperimentalGetImage::class)
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -93,7 +95,14 @@ class MainActivity : BaseActivity() {
         toggle.syncState()
 
         val headerView = navView.getHeaderView(0)
+        val txtHeaderTitle = headerView.findViewById<android.widget.TextView>(R.id.txtHeaderTitle)
         val txtUserName = headerView.findViewById<android.widget.TextView>(R.id.txtUserName)
+
+        txtHeaderTitle.setOnClickListener {
+            drawerLayout.closeDrawers()
+            // Already on MainActivity, but closing drawer gives the feel of "returning"
+        }
+
         val currentUser = FirebaseAuth.getInstance().currentUser
         
         if (currentUser != null) {
@@ -151,6 +160,7 @@ class MainActivity : BaseActivity() {
         requestNotificationPermission()
         checkAndSyncStatus()
         setupAdminNotificationEngine()
+        setupUserNotificationEngine()
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
@@ -168,17 +178,19 @@ class MainActivity : BaseActivity() {
         
         searchView.setOnQueryTextListener(object : androidx.appcompat.widget.SearchView.OnQueryTextListener {
             override fun onQueryTextSubmit(query: String?): Boolean {
+                if (!query.isNullOrBlank()) {
+                    rvResults.visibility = View.GONE
+                    val intent = Intent(this@MainActivity, ProductListActivity::class.java)
+                    intent.putExtra("SEARCH_QUERY", query)
+                    startActivity(intent)
+                }
                 searchView.clearFocus()
                 return true
             }
 
             override fun onQueryTextChange(newText: String?): Boolean {
-                if (!newText.isNullOrBlank()) {
-                    layoutContent.visibility = View.GONE
-                    rvResults.visibility = View.VISIBLE
-                    loadHomeSearchResults(newText, rvResults)
-                } else {
-                    layoutContent.visibility = View.VISIBLE
+                // Do nothing on text change to prevent showing results prematurely
+                if (newText.isNullOrBlank()) {
                     rvResults.visibility = View.GONE
                 }
                 return true
@@ -342,10 +354,57 @@ class MainActivity : BaseActivity() {
         adminNotifRef.limitToLast(1).addValueEventListener(adminNotifListener!!)
     }
 
+    private fun setupUserNotificationEngine() {
+        val currentUser = FirebaseAuth.getInstance().currentUser ?: return
+        val userId = currentUser.uid
+        
+        val userNotifRef = FirebaseUtils.getDatabase().getReference("notifications").child(userId)
+        
+        // Remove existing listener if any
+        userNotifListener?.let { userNotifRef.removeEventListener(it) }
+
+        userNotifListener = object : ValueEventListener {
+            private var isInitialData = true
+
+            override fun onDataChange(snapshot: DataSnapshot) {
+                if (isInitialData) {
+                    isInitialData = false
+                    return
+                }
+
+                // Get the newest notification (last child)
+                val lastChild = snapshot.children.lastOrNull()
+                val notification = lastChild?.getValue(Notification::class.java)
+
+                if (notification != null && !notification.read) {
+                    NotificationHelper.showSystemNotification(
+                        this@MainActivity,
+                        notification.title,
+                        notification.message,
+                        notification.id.hashCode()
+                    )
+                }
+            }
+
+            override fun onCancelled(error: DatabaseError) {
+                Log.e("UserNotif", "Error: ${error.message}")
+            }
+        }
+        
+        // Listen only for new entries
+        userNotifRef.limitToLast(1).addValueEventListener(userNotifListener!!)
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         adminNotifListener?.let {
             FirebaseUtils.getDatabase().getReference("notifications").child("admin").removeEventListener(it)
+        }
+        userNotifListener?.let {
+            val userId = FirebaseAuth.getInstance().currentUser?.uid
+            if (userId != null) {
+                FirebaseUtils.getDatabase().getReference("notifications").child(userId).removeEventListener(it)
+            }
         }
     }
 
@@ -677,6 +736,11 @@ class MainActivity : BaseActivity() {
                 showNotificationsDialog()
                 true
             }
+            R.id.action_home -> {
+                // Already on Home, maybe scroll to top
+                findViewById<ScrollView>(R.id.mainScrollView)?.smoothScrollTo(0, 0)
+                true
+            }
             else -> super.onOptionsItemSelected(item)
         }
     }
@@ -702,8 +766,7 @@ class MainActivity : BaseActivity() {
         }
         rvNotifs.adapter = adapter
 
-        val databaseUrl = "https://aurexscannerapp-default-rtdb.firebaseio.com"
-        val notifRef = FirebaseDatabase.getInstance(databaseUrl).getReference("notifications").child(userId)
+        val notifRef = FirebaseUtils.getDatabase().getReference("notifications").child(userId)
         notifRef.orderByChild("timestamp").limitToLast(50)
             .addValueEventListener(object : ValueEventListener {
                 override fun onDataChange(snapshot: DataSnapshot) {

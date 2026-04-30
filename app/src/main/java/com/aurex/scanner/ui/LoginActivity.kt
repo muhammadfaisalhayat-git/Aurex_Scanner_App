@@ -15,6 +15,7 @@ import android.widget.ProgressBar
 import android.widget.ImageButton
 import java.util.concurrent.Executor
 import com.aurex.scanner.R
+import com.aurex.scanner.util.FirebaseUtils
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.Scope
@@ -127,8 +128,7 @@ class LoginActivity : BaseActivity() {
                                 isAdmin = isAdmin,
                                 isApproved = isAdmin // Admin is auto-approved
                             )
-                            val databaseUrl = "https://aurexscannerapp-default-rtdb.firebaseio.com"
-                            FirebaseDatabase.getInstance(databaseUrl).getReference("users").child(userId).setValue(userProfile)
+                            FirebaseUtils.getDatabase().getReference("users").child(userId).setValue(userProfile)
                                 .addOnSuccessListener {
                                     if (!isAdmin) {
                                         // Send notification to admin for new registration
@@ -223,9 +223,7 @@ class LoginActivity : BaseActivity() {
                         val userId = auth.currentUser?.uid ?: ""
                         val email = auth.currentUser?.email ?: ""
                         
-                        val databaseUrl = "https://aurexscannerapp-default-rtdb.firebaseio.com"
-                        // Check if user already exists
-                        FirebaseDatabase.getInstance(databaseUrl).getReference("users").child(userId)
+                        FirebaseUtils.getDatabase().getReference("users").child(userId)
                             .addListenerForSingleValueEvent(object : ValueEventListener {
                                 override fun onDataChange(snapshot: DataSnapshot) {
                                     if (snapshot.exists()) {
@@ -249,8 +247,7 @@ class LoginActivity : BaseActivity() {
                                             isApproved = true // Auto-approved for Google login
                                         )
                                         
-                                        val databaseUrl = "https://aurexscannerapp-default-rtdb.firebaseio.com"
-                                        FirebaseDatabase.getInstance(databaseUrl).getReference("users").child(userId).setValue(newUser)
+                                        FirebaseUtils.getDatabase().getReference("users").child(userId).setValue(newUser)
                                             .addOnSuccessListener {
                                                 getSharedPreferences("AurexPrefs", MODE_PRIVATE).edit()
                                                     .putBoolean("rememberMe", true)
@@ -297,8 +294,7 @@ class LoginActivity : BaseActivity() {
                     return@addOnCompleteListener
                 }
 
-                val databaseUrl = "https://aurexscannerapp-default-rtdb.firebaseio.com"
-                FirebaseDatabase.getInstance(databaseUrl).getReference("users").child(userId)
+                FirebaseUtils.getDatabase().getReference("users").child(userId)
                     .addListenerForSingleValueEvent(object : ValueEventListener {
                         override fun onDataChange(snapshot: DataSnapshot) {
                             val user = snapshot.getValue(User::class.java)

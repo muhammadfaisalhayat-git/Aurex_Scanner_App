@@ -11,6 +11,9 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.aurex.scanner.util.LocaleHelper
 
+import android.content.Intent
+import android.view.MenuItem
+
 open class BaseActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         val prefs = getSharedPreferences("AurexPrefs", MODE_PRIVATE)
@@ -19,6 +22,24 @@ open class BaseActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         
         requestNotificationPermission()
+    }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        return when (item.itemId) {
+            com.aurex.scanner.R.id.action_home -> {
+                if (this !is MainActivity) {
+                    val intent = Intent(this, MainActivity::class.java)
+                    intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                    startActivity(intent)
+                }
+                true
+            }
+            android.R.id.home -> {
+                onBackPressed()
+                true
+            }
+            else -> super.onOptionsItemSelected(item)
+        }
     }
 
     private fun requestNotificationPermission() {

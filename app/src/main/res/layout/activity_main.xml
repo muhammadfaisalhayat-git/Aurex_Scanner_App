@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <androidx.drawerlayout.widget.DrawerLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/drawer_layout"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
@@ -17,141 +18,147 @@
             android:background="?attr/colorPrimary"
             app:titleTextColor="@android:color/white" />
 
-        <LinearLayout
+        <ScrollView
+            android:id="@+id/mainScrollView"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:layout_below="@id/toolbar"
             android:layout_above="@+id/project_footer"
-            android:gravity="top|center_horizontal"
-            android:orientation="vertical"
-            android:padding="32dp"
-            android:background="@android:color/white">
+            android:layout_below="@id/toolbar"
+            android:fillViewport="true"
+            android:background="@color/white">
 
-            <TextView
-                android:layout_width="wrap_content"
+            <LinearLayout
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="20dp"
-                android:text="@string/open_menu_for_more"
-                android:textSize="14sp"
-                android:textColor="@android:color/darker_gray" />
+                android:gravity="top|center_horizontal"
+                android:nestedScrollingEnabled="true"
+                android:orientation="vertical"
+                android:padding="32dp">
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/welcome_to_aurex"
-                android:textSize="28sp"
-                android:textStyle="bold"
-                android:textColor="@android:color/black"
-                android:layout_marginBottom="16dp"/>
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="16dp"
+                    android:text="@string/welcome_to_aurex"
+                    android:textColor="#333333"
+                    android:textSize="28sp"
+                    android:textStyle="bold" />
 
-            <com.google.android.material.card.MaterialCardView
+                <com.google.android.material.card.MaterialCardView
                 android:id="@+id/searchCardHome"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="24dp"
                 app:cardCornerRadius="12dp"
                 app:cardElevation="2dp"
-                app:strokeWidth="1dp"
-                app:strokeColor="#E0E0E0">
+                app:strokeColor="#E0E0E0"
+                app:strokeWidth="1dp">
 
-                <androidx.appcompat.widget.SearchView
-                    android:id="@+id/searchViewHome"
+                <LinearLayout
                     android:layout_width="match_parent"
-                    android:layout_height="50dp"
-                    app:iconifiedByDefault="false"
-                    app:queryHint="@string/search_hint"
-                    app:queryBackground="@android:color/transparent"
-                    app:searchIcon="@android:drawable/ic_menu_search" />
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+
+                    <androidx.appcompat.widget.SearchView
+                        android:id="@+id/searchViewHome"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        app:iconifiedByDefault="false"
+                        app:queryBackground="@android:color/transparent"
+                        app:queryHint="@string/search_hint"
+                        app:searchIcon="@android:drawable/ic_menu_search" />
+
+                    <androidx.recyclerview.widget.RecyclerView
+                        android:id="@+id/rvHomeSearchResults"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:scrollbars="vertical"
+                        android:visibility="gone" />
+                </LinearLayout>
 
             </com.google.android.material.card.MaterialCardView>
 
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/rvHomeSearchResults"
-                android:layout_width="match_parent"
-                android:layout_height="0dp"
-                android:layout_weight="1"
-                android:visibility="gone"
-                android:scrollbars="vertical" />
-
-            <LinearLayout
-                android:id="@+id/layoutHomeContent"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:gravity="center_horizontal">
-
-                <ImageView
+                <LinearLayout
+                    android:id="@+id/layoutHomeContent"
                     android:layout_width="match_parent"
-                    android:layout_height="240dp"
-                    android:src="@drawable/main_logo"
-                    android:scaleType="fitCenter"
-                    android:contentDescription="Bin Awf Logo"
-                    android:layout_marginBottom="32dp" />
+                    android:layout_height="wrap_content"
+                    android:gravity="center_horizontal"
+                    android:orientation="vertical">
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnScanHome"
-                    android:layout_width="match_parent"
-                    android:layout_height="64dp"
-                    android:layout_marginBottom="12dp"
-                    android:text="@string/scan_product"
-                    android:textSize="18sp"
-                    app:backgroundTint="@color/primary"
-                    android:textColor="@android:color/white"
-                    app:cornerRadius="8dp" />
+                    <ImageView
+                        android:layout_width="239dp"
+                        android:layout_height="239dp"
+                        android:layout_marginBottom="32dp"
+                        android:contentDescription="Bin Awf Logo"
+                        android:foreground="@drawable/glass_circle_bg"
+                        android:scaleType="centerCrop"
+                        android:src="@drawable/main_logo"
+                        app:srcCompat="@drawable/main_logo" />
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnAdminHome"
-                    style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
-                    android:layout_width="match_parent"
-                    android:layout_height="64dp"
-                    android:layout_marginBottom="12dp"
-                    android:text="@string/admin_dashboard"
-                    android:textSize="18sp"
-                    android:visibility="gone"
-                    app:backgroundTint="#607D8B"
-                    android:textColor="@android:color/white"
-                    app:cornerRadius="8dp" />
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnScanHome"
+                        android:layout_width="match_parent"
+                        android:layout_height="64dp"
+                        android:layout_marginBottom="12dp"
+                        android:text="@string/scan_product"
+                        android:textColor="@android:color/white"
+                        android:textSize="18sp"
+                        app:backgroundTint="@color/primary"
+                        app:cornerRadius="8dp" />
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnNearExpiryHome"
-                    style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
-                    android:layout_width="match_parent"
-                    android:layout_height="64dp"
-                    android:layout_marginBottom="12dp"
-                    android:text="@string/near_expiry_products"
-                    android:textSize="18sp"
-                    app:backgroundTint="#FF9800"
-                    android:textColor="@android:color/white"
-                    app:cornerRadius="8dp" />
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnAdminHome"
+                        style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="64dp"
+                        android:layout_marginBottom="12dp"
+                        android:text="@string/admin_dashboard"
+                        android:textColor="@android:color/white"
+                        android:textSize="18sp"
+                        android:visibility="gone"
+                        app:backgroundTint="#607D8B"
+                        app:cornerRadius="8dp" />
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnHistoryHome"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                    android:layout_width="match_parent"
-                    android:layout_height="64dp"
-                    android:layout_marginBottom="12dp"
-                    android:text="@string/scan_history"
-                    android:textSize="18sp"
-                    app:strokeColor="@color/primary"
-                    android:textColor="@color/primary"
-                    app:cornerRadius="8dp" />
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnNearExpiryHome"
+                        style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="64dp"
+                        android:layout_marginBottom="12dp"
+                        android:text="@string/near_expiry_products"
+                        android:textColor="@android:color/white"
+                        android:textSize="18sp"
+                        app:backgroundTint="#FF9800"
+                        app:cornerRadius="8dp" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnHistoryHome"
+                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="64dp"
+                        android:layout_marginBottom="12dp"
+                        android:text="@string/scan_history"
+                        android:textColor="@color/primary"
+                        android:textSize="18sp"
+                        app:cornerRadius="8dp"
+                        app:strokeColor="@color/primary" />
+                </LinearLayout>
+
             </LinearLayout>
-
-
-
-        </LinearLayout>
+        </ScrollView>
 
         <TextView
             android:id="@+id/project_footer"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_alignParentBottom="true"
+            android:background="#F5F5F5"
             android:gravity="center"
             android:padding="16dp"
             android:text="@string/project_of_aurex_erp"
+            android:textColor="#666666"
             android:textSize="12sp"
-            android:textStyle="italic"
-            android:textColor="@android:color/darker_gray" />
+            android:textStyle="italic" />
 
         <com.google.android.gms.ads.AdView
             android:id="@+id/adView"

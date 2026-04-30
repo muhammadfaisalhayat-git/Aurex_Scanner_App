@@ -1,45 +1,53 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical">
 
     <TextView
+        android:id="@+id/txtHeaderTitle"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="#616161"
+        android:background="@color/primary"
+        android:backgroundTint="@color/primary"
+        android:clickable="true"
+        android:focusable="true"
+        android:foreground="?attr/selectableItemBackground"
+        android:gravity="center"
         android:paddingTop="48dp"
         android:paddingBottom="16dp"
-        android:text="Bin Awf Agricultural"
+        android:text="@string/welcome_to_aurex"
         android:textColor="@android:color/white"
         android:textSize="20sp"
-        android:textStyle="bold"
-        android:gravity="center" />
+        android:textStyle="bold" />
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@android:color/white"
+        android:background="@color/white"
         android:orientation="vertical"
         android:padding="24dp">
 
         <ImageView
             android:id="@+id/imgNavLogo"
             android:layout_width="match_parent"
-            android:layout_height="140dp"
+            android:layout_height="180dp"
+            android:adjustViewBounds="false"
+            android:scaleType="fitCenter"
             android:src="@drawable/main_logo"
-            android:scaleType="fitCenter" />
+            tools:srcCompat="@drawable/app_icon" />
 
         <TextView
             android:id="@+id/txtUserName"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
-            android:text="User Name"
-            android:textColor="@android:color/black"
+            android:gravity="center"
+            android:text="@string/admin_email"
+            android:textColor="@color/black"
             android:textSize="16sp"
-            android:textStyle="bold"
-            android:gravity="center" />
+            android:textStyle="bold" />
     </LinearLayout>
 
     <View

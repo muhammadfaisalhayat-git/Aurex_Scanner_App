@@ -56,8 +56,7 @@ class AdminActivity : BaseActivity() {
     
     private val usersList = mutableListOf<User>()
     private lateinit var userAdapter: UserAdapter
-    private val databaseUrl = "https://aurexscannerapp-default-rtdb.firebaseio.com"
-    private val database = FirebaseDatabase.getInstance(databaseUrl)
+    private val database = FirebaseUtils.getDatabase()
     private val usersRef = database.getReference("users")
 
     private lateinit var swipeRefresh: androidx.swiperefreshlayout.widget.SwipeRefreshLayout
@@ -114,6 +113,29 @@ class AdminActivity : BaseActivity() {
         loadDashboardData()
         observeUsers()
         checkCurrentAdmin()
+        
+        val toolbar = findViewById<androidx.appcompat.widget.Toolbar>(R.id.toolbar)
+        setSupportActionBar(toolbar)
+        supportActionBar?.setDisplayHomeAsUpEnabled(true)
+        supportActionBar?.setHomeAsUpIndicator(android.R.drawable.ic_menu_today) // Another common icon
+    }
+
+    override fun onCreateOptionsMenu(menu: android.view.Menu): Boolean {
+        menuInflater.inflate(R.menu.top_menu, menu)
+        menu.findItem(R.id.action_home)?.isVisible = false
+        return true
+    }
+
+    override fun onOptionsItemSelected(item: android.view.MenuItem): Boolean {
+        return when (item.itemId) {
+            android.R.id.home -> {
+                val intent = android.content.Intent(this, MainActivity::class.java)
+                intent.flags = android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP or android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP
+                startActivity(intent)
+                true
+            }
+            else -> super.onOptionsItemSelected(item)
+        }
     }
 
     private fun setupClickListeners() {

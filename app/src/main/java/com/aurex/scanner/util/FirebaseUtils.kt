@@ -12,17 +12,18 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import android.util.Log
 
 object FirebaseUtils {
-    const val DATABASE_URL = "https://aurexscannerapp-default-rtdb.firebaseio.com"
-
+    
     fun getDatabase(): FirebaseDatabase {
-        return FirebaseDatabase.getInstance()
+        val db = FirebaseDatabase.getInstance()
+        // Persistence is already set in AurexApp.kt
+        return db
     }
 
     fun getFirestore(): FirebaseFirestore {
         val firestore = FirebaseFirestore.getInstance()
-        // Optional: Configure settings if needed
         val settings = FirebaseFirestoreSettings.Builder()
             .setPersistenceEnabled(true)
             .build()
@@ -60,8 +61,6 @@ object FirebaseUtils {
         var current = 0
         try {
             val rtdb = getDatabase()
-            rtdb.goOnline()
-            
             val userRef = rtdb.getReference("users").child(user.uid).child("products")
             
             withContext(Dispatchers.Main) {
@@ -70,17 +69,16 @@ object FirebaseUtils {
             }
 
             for (product in productsToUpload) {
-                val code = if (product.productCode.isBlank()) {
-                    "TEMP_${System.currentTimeMillis()}_${product.id}"
-                } else {
-                    product.productCode.replace(".", "_")
+                if (product.productCode.isBlank()) {
+                    product.productCode = "CODE_${System.currentTimeMillis()}_${product.id}"
+                }
+
+                val code = product.productCode.replace(".", "_")
                         .replace("#", "_")
                         .replace("$", "_")
                         .replace("[", "_")
                         .replace("]", "_")
-                }
 
-                // Upload individual product
                 userRef.child(code).setValue(product).await()
                 
                 current++
@@ -96,7 +94,6 @@ object FirebaseUtils {
                     )
                 }
 
-                // Mark as synced locally
                 withContext(Dispatchers.IO) {
                     product.isSynced = true
                     db.productDao().update(product)
@@ -110,15 +107,12 @@ object FirebaseUtils {
                 Toast.makeText(context, "Backup successful!", Toast.LENGTH_SHORT).show()
             }
         } catch (e: Exception) {
+            Log.e("FirebaseUtils", "Backup failed", e)
             withContext(Dispatchers.Main) {
                 NotificationHelper.cancelNotification(context)
-                val errorMsg = when (e) {
-                    is kotlinx.coroutines.TimeoutCancellationException -> "Connection timed out. Please check your internet signal and try again."
-                    else -> e.message ?: e.toString()
-                }
                 androidx.appcompat.app.AlertDialog.Builder(context)
                     .setTitle("Backup Failed")
-                    .setMessage(errorMsg)
+                    .setMessage(e.message ?: "Unknown error")
                     .setPositiveButton("OK", null)
                     .show()
             }
@@ -128,25 +122,28 @@ object FirebaseUtils {
     suspend fun restoreFromRTDB(context: Context, onProgress: ((Int, Int, String) -> Unit)? = null) {
         val user = FirebaseAuth.getInstance().currentUser ?: return
         val rtdb = getDatabase()
-        rtdb.goOnline()
-        
         val userRef = rtdb.getReference("users").child(user.uid).child("products")
 
         try {
             withContext(Dispatchers.Main) {
                 onProgress?.invoke(0, 0, "Connecting to cloud...")
-                NotificationHelper.showProgressNotification(context, "Cloud Restore", "Connecting...", 0, 0, true)
+                NotificationHelper.showProgressNotification(context, "Cloud Restore", "Connecting to secure server...", 0, 0, true)
             }
 
-            // Perform fetch with an extended timeout (60 seconds)
-            val snapshot = withTimeout(60000L) {
+            // Using .get().await() which is more reliable for single fetches
+            // and respects local persistence better.
+            val snapshot = withTimeout(60000L) { // 60 seconds is plenty for a good connection
                 userRef.get().await()
             }
 
             if (!snapshot.exists()) {
                 withContext(Dispatchers.Main) {
                     NotificationHelper.cancelNotification(context)
-                    Toast.makeText(context, "No backup found on server", Toast.LENGTH_SHORT).show()
+                    androidx.appcompat.app.AlertDialog.Builder(context)
+                        .setTitle("Restore")
+                        .setMessage("No backup data found for this account on the server.")
+                        .setPositiveButton("OK", null)
+                        .show()
                 }
                 return
             }
@@ -158,33 +155,62 @@ object FirebaseUtils {
             snapshot.children.forEach { child ->
                 val product = child.getValue(Product::class.java)
                 if (product != null) {
+                    product.isSynced = true
+                    if (product.productCode.isBlank()) {
+                        product.productCode = child.key ?: "RESTORED_${System.currentTimeMillis()}_$current"
+                    }
                     products.add(product)
                     current++
-                    onProgress?.invoke(current, total, product.name)
-                    NotificationHelper.showProgressNotification(
-                        context, 
-                        "Cloud Restore", 
-                        "Downloading: ${product.name} ($current/$total)", 
-                        current, 
-                        total, 
-                        false
-                    )
+                    
+                    withContext(Dispatchers.Main) {
+                        onProgress?.invoke(current, total, product.name)
+                        NotificationHelper.showProgressNotification(
+                            context, 
+                            "Cloud Restore", 
+                            "Downloading: ${product.name} ($current/$total)", 
+                            current, 
+                            total, 
+                            false
+                        )
+                    }
                 }
             }
 
             if (products.isNotEmpty()) {
                 val localDb = AppDatabase.getDatabase(context)
-                localDb.productDao().insertAll(products)
+                withContext(Dispatchers.IO) {
+                    localDb.productDao().insertAll(products)
+                }
+                
                 withContext(Dispatchers.Main) {
                     NotificationHelper.showSystemNotification(context, "Cloud Restore", "Successfully restored ${products.size} products.")
                     NotificationHelper.cancelNotification(context)
-                    Toast.makeText(context, "Restored ${products.size} products", Toast.LENGTH_SHORT).show()
+                    androidx.appcompat.app.AlertDialog.Builder(context)
+                        .setTitle("Success")
+                        .setMessage("Successfully restored ${products.size} products from cloud.")
+                        .setPositiveButton("OK", null)
+                        .show()
+                }
+            } else {
+                withContext(Dispatchers.Main) {
+                    NotificationHelper.cancelNotification(context)
+                    Toast.makeText(context, "Restore complete: No products found in backup.", Toast.LENGTH_SHORT).show()
                 }
             }
         } catch (e: Exception) {
+            Log.e("FirebaseUtils", "Restore failed", e)
             withContext(Dispatchers.Main) {
                 NotificationHelper.cancelNotification(context)
-                Toast.makeText(context, "Restore failed: ${e.message}", Toast.LENGTH_LONG).show()
+                val errorMsg = when(e) {
+                    is kotlinx.coroutines.TimeoutCancellationException -> 
+                        "Connection timed out. The server is not responding. Please check your network and try again."
+                    else -> e.message ?: "An unknown error occurred during restore."
+                }
+                androidx.appcompat.app.AlertDialog.Builder(context)
+                    .setTitle("Restore Failed")
+                    .setMessage(errorMsg)
+                    .setPositiveButton("OK", null)
+                    .show()
             }
         }
     }

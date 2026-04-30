@@ -33,21 +33,33 @@ object NotificationHelper {
         db.child(userId).child(notificationId).child("read").setValue(true)
     }
 
-    fun showSystemNotification(context: android.content.Context, title: String, message: String, notificationId: Int = 1002) {
+    fun showSystemNotification(context: android.content.Context, title: String, message: String, notificationId: Int = (System.currentTimeMillis() % 10000).toInt()) {
         val channelId = "general_notifications_channel"
         val channelName = "General Notifications"
         val notificationManager = context.getSystemService(android.content.Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
 
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-            val channel = android.app.NotificationChannel(channelId, channelName, android.app.NotificationManager.IMPORTANCE_HIGH)
+            val channel = android.app.NotificationChannel(channelId, channelName, android.app.NotificationManager.IMPORTANCE_HIGH).apply {
+                description = "General App Notifications"
+                enableLights(true)
+                lightColor = android.graphics.Color.GREEN
+                enableVibration(true)
+            }
             notificationManager.createNotificationChannel(channel)
         }
+
+        val intent = android.content.Intent(context, com.aurex.scanner.ui.MainActivity::class.java).apply {
+            flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK
+        }
+        val pendingIntent = android.app.PendingIntent.getActivity(context, 0, intent, android.app.PendingIntent.FLAG_IMMUTABLE)
 
         val builder = androidx.core.app.NotificationCompat.Builder(context, channelId)
             .setSmallIcon(com.aurex.scanner.R.drawable.ic_notifications)
             .setContentTitle(title)
             .setContentText(message)
             .setPriority(androidx.core.app.NotificationCompat.PRIORITY_HIGH)
+            .setCategory(androidx.core.app.NotificationCompat.CATEGORY_ALARM)
+            .setContentIntent(pendingIntent)
             .setAutoCancel(true)
 
         notificationManager.notify(notificationId, builder.build())

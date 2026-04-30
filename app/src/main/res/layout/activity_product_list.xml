@@ -4,6 +4,17 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
+    <androidx.appcompat.widget.Toolbar
+        android:id="@+id/toolbar"
+        android:layout_width="0dp"
+        android:layout_height="?attr/actionBarSize"
+        android:background="?attr/colorPrimary"
+        app:title="@string/scan_history"
+        app:titleTextColor="@android:color/white"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
     <androidx.appcompat.widget.SearchView
         android:id="@+id/searchViewList"
         android:layout_width="0dp"
@@ -11,7 +22,7 @@
         android:background="#FFFFFF"
         app:iconifiedByDefault="false"
         app:queryHint="@string/search_hint"
-        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/toolbar"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
@@ -19,18 +30,23 @@
         android:id="@+id/sortContainer"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:background="#F5F5F5"
         android:orientation="horizontal"
         android:padding="8dp"
-        android:background="#F5F5F5"
         app:layout_constraintTop_toBottomOf="@id/searchViewList">
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="@string/filter_by"
-            android:textStyle="bold"
             android:layout_gravity="center_vertical"
-            android:paddingEnd="8dp"/>
+            android:background="#F5F5F5"
+            android:drawableLeft="@drawable/glass_circle_bg"
+            android:paddingEnd="8dp"
+            android:text="@string/filter_by"
+            android:textColor="#333333"
+            android:textStyle="bold"
+            app:drawableLeftCompat="@drawable/glass_circle_bg"
+            app:drawableStartCompat="@drawable/glass_circle_bg" />
 
         <HorizontalScrollView
             android:layout_width="0dp"
@@ -47,24 +63,24 @@
                     android:id="@+id/chipCategory"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="@string/category_filter"
                     android:layout_marginEnd="4dp"
-                    app:chipIcon="@android:drawable/ic_menu_agenda"/>
+                    android:text="@string/category_filter"
+                    app:chipIcon="@android:drawable/ic_menu_agenda" />
 
                 <com.google.android.material.chip.Chip
                     android:id="@+id/chipWarehouse"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="@string/warehouse_filter"
                     android:layout_marginEnd="4dp"
-                    app:chipIcon="@android:drawable/ic_menu_myplaces"/>
+                    android:text="@string/warehouse_filter"
+                    app:chipIcon="@android:drawable/ic_menu_myplaces" />
 
                 <com.google.android.material.chip.Chip
                     android:id="@+id/chipExpiry"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="@string/expiry"
-                    app:chipIcon="@android:drawable/ic_lock_idle_alarm"/>
+                    app:chipIcon="@android:drawable/ic_lock_idle_alarm" />
             </LinearLayout>
         </HorizontalScrollView>
     </LinearLayout>
@@ -73,6 +89,7 @@
         android:id="@+id/recyclerView"
         android:layout_width="0dp"
         android:layout_height="0dp"
+        android:background="@color/white"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"

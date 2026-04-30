@@ -1,7 +1,7 @@
 <resources>
     <string name="app_name">Aurex Scanner</string>
     <string name="project_of_aurex_erp">A Project of Aurex ERP</string>
-    <string name="power_your_business_growth">Bin Awf Agricultural</string>
+    <string name="power_your_business_growth">Aurex Scanner</string>
     <string name="navigation_drawer_open">Open navigation drawer</string>
     <string name="navigation_drawer_close">Close navigation drawer</string>
 
@@ -22,6 +22,7 @@
     <string name="enable_biometric">Enable Biometric Login</string>
     <string name="biometric_desc">Use fingerprint or face recognition for faster access.</string>
     <string name="welcome_to_aurex">Bin Awf Agricultural</string>
+    <string name="admin_email">admin@aurex.com</string>
     <string name="open_menu_for_more">Open the side menu for more options</string>
     <string name="near_expiry_products">Near Expiry Products</string>
 

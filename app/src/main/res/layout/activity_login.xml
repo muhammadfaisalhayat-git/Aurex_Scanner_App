@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@android:color/white">
+    android:background="@color/white">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -14,133 +15,134 @@
         <ImageView
             android:layout_width="120dp"
             android:layout_height="120dp"
-            android:src="@drawable/logo"
             android:layout_marginBottom="16dp"
-            android:contentDescription="Aurex Logo" />
+            android:contentDescription="Aurex Logo"
+            android:src="@drawable/app_icon"
+            tools:srcCompat="@drawable/app_icon_vector" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
             android:text="Aurex Scanner"
-            android:textSize="32sp"
-            android:textStyle="bold"
             android:textColor="#333333"
-            android:layout_marginBottom="8dp"/>
+            android:textSize="32sp"
+            android:textStyle="bold" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginBottom="40dp"
             android:text="@string/power_your_business_growth"
-            android:textSize="14sp"
             android:textColor="#666666"
-            android:layout_marginBottom="40dp"/>
+            android:textSize="14sp"
+            tools:text="Power your Business Growth" />
 
         <EditText
             android:id="@+id/editEmail"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
             android:hint="@string/email"
-            android:inputType="textEmailAddress"
-            android:layout_marginBottom="12dp"/>
+            android:inputType="textEmailAddress" />
 
         <EditText
             android:id="@+id/editPassword"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
             android:hint="@string/password"
-            android:inputType="textPassword"
-            android:layout_marginBottom="12dp"/>
+            android:inputType="textPassword" />
 
         <EditText
             android:id="@+id/editWarehouseName"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
             android:hint="Warehouse Name"
             android:inputType="text"
-            android:layout_marginBottom="12dp"
-            android:visibility="gone"/>
+            android:visibility="gone" />
 
         <EditText
             android:id="@+id/editWarehouseCode"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginBottom="24dp"
             android:hint="Warehouse Code"
             android:inputType="text"
-            android:layout_marginBottom="24dp"
-            android:visibility="gone"/>
+            android:visibility="gone" />
 
         <CheckBox
             android:id="@+id/cbRememberMe"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/remember_me"
             android:layout_marginBottom="16dp"
-            android:checked="true"/>
+            android:checked="true"
+            android:text="@string/remember_me" />
 
         <Button
             android:id="@+id/btnLogin"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/login"
+            android:layout_marginBottom="8dp"
             android:backgroundTint="#4CAF50"
-            android:textColor="@android:color/white"
-            android:layout_marginBottom="8dp"/>
+            android:text="@string/login"
+            android:textColor="@android:color/white" />
 
         <ProgressBar
             android:id="@+id/loginProgress"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginBottom="8dp"
-            android:visibility="gone"
-            android:indeterminateTint="#4CAF50"/>
+            android:indeterminateTint="#4CAF50"
+            android:visibility="gone" />
 
-        <ImageButton
+        <ImageButton xmlns:app="http://schemas.android.com/apk/res-auto"
             android:id="@+id/btnBiometric"
             android:layout_width="64dp"
             android:layout_height="64dp"
-            android:src="@drawable/ic_biometric_face"
+            android:layout_marginBottom="8dp"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:contentDescription="@string/login_with_biometrics"
-            android:layout_marginBottom="8dp"
-            android:visibility="gone"
-            android:scaleType="fitCenter"
             android:padding="8dp"
-            xmlns:app="http://schemas.android.com/apk/res-auto"
-            app:tint="#4CAF50"/>
+            android:scaleType="fitCenter"
+            android:src="@drawable/ic_biometric_face"
+            android:visibility="gone"
+            app:tint="#4CAF50" />
 
         <Button
             android:id="@+id/btnRegister"
+            style="@style/Widget.MaterialComponents.Button.TextButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/register"
-            style="@style/Widget.MaterialComponents.Button.TextButton"/>
+            android:text="@string/register" />
 
         <TextView
             android:id="@+id/txtForgotPassword"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="@string/forgot_password"
-            android:textColor="#4CAF50"
             android:layout_marginBottom="8dp"
             android:clickable="true"
-            android:focusable="true"/>
+            android:focusable="true"
+            android:text="@string/forgot_password"
+            android:textColor="#4CAF50" />
 
         <View
             android:layout_width="match_parent"
             android:layout_height="1dp"
-            android:background="#DDDDDD"
             android:layout_marginVertical="24dp"
-            android:visibility="gone"/>
+            android:background="#DDDDDD"
+            android:visibility="gone" />
 
         <Button
             android:id="@+id/btnGoogleSignIn"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/continue_with_google"
             android:backgroundTint="#FFFFFF"
-            android:textColor="#757575"
             android:elevation="2dp"
-            android:visibility="gone"/>
+            android:text="@string/continue_with_google"
+            android:textColor="#757575"
+            android:visibility="gone" />
 
     </LinearLayout>
 
@@ -151,13 +153,13 @@
         android:layout_alignParentTop="true"
         android:layout_alignParentEnd="true"
         android:layout_margin="16dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:clickable="true"
+        android:elevation="4dp"
+        android:focusable="true"
         android:padding="12dp"
         android:text="@string/switch_language"
         android:textColor="#4CAF50"
-        android:textStyle="bold"
-        android:clickable="true"
-        android:focusable="true"
-        android:background="?attr/selectableItemBackgroundBorderless"
-        android:elevation="4dp"/>
+        android:textStyle="bold" />
 
 </RelativeLayout>

@@ -2,6 +2,12 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
     <item
+        android:id="@+id/action_home"
+        android:icon="@drawable/ic_home"
+        android:title="Home"
+        app:showAsAction="always"
+        app:iconTint="@android:color/white" />
+    <item
         android:id="@+id/action_notifications"
         android:icon="@drawable/ic_notifications"
         android:title="Notifications"
