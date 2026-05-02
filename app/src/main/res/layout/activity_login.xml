@@ -142,6 +142,9 @@
             android:elevation="2dp"
             android:text="@string/continue_with_google"
             android:textColor="#757575"
+            android:drawableStart="@drawable/ic_google_logo"
+            android:paddingStart="24dp"
+            android:drawablePadding="16dp"
             android:visibility="visible" />
 
     </LinearLayout>
