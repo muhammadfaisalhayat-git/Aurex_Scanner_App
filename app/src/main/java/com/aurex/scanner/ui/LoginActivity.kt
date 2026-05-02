@@ -277,11 +277,15 @@ class LoginActivity : BaseActivity() {
 
     private fun performLogin(email: String, pass: String, rememberMe: Boolean) {
         val prefs = getSharedPreferences("AurexPrefs", MODE_PRIVATE)
+        setLoading(true)
+        
         auth.signInWithEmailAndPassword(email, pass).addOnCompleteListener { task ->
             if (task.isSuccessful) {
-                val userId = auth.currentUser?.uid ?: ""
+                val user = auth.currentUser
+                val userId = user?.uid ?: ""
                 val emailTrimmed = email.lowercase().trim()
                 
+                // Admin bypass
                 if (emailTrimmed == "admin@aurex.com") {
                     prefs.edit()
                         .putBoolean("rememberMe", rememberMe)
@@ -294,13 +298,28 @@ class LoginActivity : BaseActivity() {
                     return@addOnCompleteListener
                 }
 
-                FirebaseUtils.getDatabase().getReference("users").child(userId)
-                    .addListenerForSingleValueEvent(object : ValueEventListener {
-                        override fun onDataChange(snapshot: DataSnapshot) {
-                            val user = snapshot.getValue(User::class.java)
+                // For regular users, check approval status with a fallback/timeout
+                val userRef = FirebaseUtils.getDatabase().getReference("users").child(userId)
+                
+                // Set a timeout for the database check
+                val handler = android.os.Handler(android.os.Looper.getMainLooper())
+                val timeoutRunnable = Runnable {
+                    if (loginProgress.visibility == View.VISIBLE) {
+                        setLoading(false)
+                        Toast.makeText(this, "Server check timed out. Please try again or contact admin.", Toast.LENGTH_LONG).show()
+                        auth.signOut()
+                    }
+                }
+                handler.postDelayed(timeoutRunnable, 15000) // 15 seconds timeout
+
+                userRef.addListenerForSingleValueEvent(object : ValueEventListener {
+                    override fun onDataChange(snapshot: DataSnapshot) {
+                        handler.removeCallbacks(timeoutRunnable)
+                        if (!isDestroyed && !isFinishing) {
+                            val userProfile = snapshot.getValue(User::class.java)
                             
-                            if (user?.isApproved == true) {
-                                val isAdmin = user.isAdmin
+                            if (userProfile?.isApproved == true) {
+                                val isAdmin = userProfile.isAdmin
                                 
                                 prefs.edit()
                                     .putBoolean("rememberMe", rememberMe)
@@ -310,7 +329,6 @@ class LoginActivity : BaseActivity() {
                                     .apply()
                                 setLoading(false)
                                 
-                                // Show local push notification for login
                                 com.aurex.scanner.util.NotificationHelper.showSystemNotification(
                                     this@LoginActivity,
                                     "Login Successful",
@@ -324,16 +342,21 @@ class LoginActivity : BaseActivity() {
                                 Toast.makeText(this@LoginActivity, "Account pending approval. Please contact administrator.", Toast.LENGTH_LONG).show()
                             }
                         }
+                    }
 
-                        override fun onCancelled(error: DatabaseError) {
+                    override fun onCancelled(error: DatabaseError) {
+                        handler.removeCallbacks(timeoutRunnable)
+                        if (!isDestroyed && !isFinishing) {
                             auth.signOut()
                             setLoading(false)
-                            Toast.makeText(this@LoginActivity, "Error: ${error.message}", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(this@LoginActivity, "Database Error: ${error.message}", Toast.LENGTH_SHORT).show()
                         }
-                    })
+                    }
+                })
             } else {
                 setLoading(false)
-                Toast.makeText(this, "Login Failed: ${task.exception?.message}", Toast.LENGTH_SHORT).show()
+                val errorMsg = task.exception?.message ?: "Login Failed"
+                Toast.makeText(this, errorMsg, Toast.LENGTH_SHORT).show()
             }
         }
     }
