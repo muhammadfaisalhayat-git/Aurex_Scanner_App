@@ -228,16 +228,16 @@ class LoginActivity : BaseActivity() {
                         val userId = user?.uid ?: ""
                         val email = user?.email ?: ""
 
-                        // Fetch profile with a robust timeout
+                        // Check profile
                         val userRef = FirebaseUtils.getDatabase().getReference("users").child(userId)
-                        val snapshot = withTimeoutOrNull(20000L) {
+                        val snapshot = withTimeoutOrNull(15000L) {
                             userRef.get().await()
                         }
 
                         if (snapshot == null) {
                             setLoading(false)
                             auth.signOut()
-                            Toast.makeText(this@LoginActivity, "Server busy. Please try again.", Toast.LENGTH_LONG).show()
+                            Toast.makeText(this@LoginActivity, "Connection timeout: Profile check failed", Toast.LENGTH_LONG).show()
                             return@launch
                         }
 
@@ -253,7 +253,7 @@ class LoginActivity : BaseActivity() {
                             } else {
                                 auth.signOut()
                                 setLoading(false)
-                                Toast.makeText(this@LoginActivity, "Account pending approval. Please contact administrator.", Toast.LENGTH_LONG).show()
+                                Toast.makeText(this@LoginActivity, "Account pending approval.", Toast.LENGTH_LONG).show()
                             }
                         } else {
                             // New User Registration
@@ -267,7 +267,16 @@ class LoginActivity : BaseActivity() {
                                 isApproved = isAdmin
                             )
                             
-                            userRef.setValue(newUser).await()
+                            // Try to write to DB with explicit error handling
+                            try {
+                                userRef.setValue(newUser).await()
+                            } catch (dbEx: Exception) {
+                                setLoading(false)
+                                auth.signOut()
+                                Log.e("LoginActivity", "Database write failed", dbEx)
+                                Toast.makeText(this@LoginActivity, "Failed to create profile: ${dbEx.localizedMessage}", Toast.LENGTH_LONG).show()
+                                return@launch
+                            }
                             
                             setLoading(false)
                             if (isAdmin) {

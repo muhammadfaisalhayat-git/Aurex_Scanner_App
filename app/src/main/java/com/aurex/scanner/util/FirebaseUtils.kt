@@ -15,10 +15,10 @@ import kotlinx.coroutines.withTimeout
 import android.util.Log
 
 object FirebaseUtils {
+    private const val DATABASE_URL = "https://aurexscannerapp-default-rtdb.firebaseio.com"
     
     fun getDatabase(): FirebaseDatabase {
-        val db = FirebaseDatabase.getInstance()
-        // Persistence is already set in AurexApp.kt
+        val db = FirebaseDatabase.getInstance(DATABASE_URL)
         return db
     }
 
