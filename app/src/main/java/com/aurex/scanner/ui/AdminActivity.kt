@@ -253,6 +253,7 @@ class AdminActivity : BaseActivity() {
             }
             override fun onCancelled(error: DatabaseError) {
                 android.util.Log.e("AdminActivity", "Database Error: ${error.message}")
+                Toast.makeText(this@AdminActivity, "Permission Denied: ${error.message}", Toast.LENGTH_LONG).show()
             }
         })
     }
