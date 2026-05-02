@@ -84,16 +84,20 @@ class SettingsActivity : BaseActivity() {
         // Admin Settings
         val isAdmin = prefs.getBoolean("isAdmin", false)
         val btnWipe = findViewById<MaterialButton>(R.id.btnWipeServerData)
+        val btnClean = findViewById<MaterialButton>(R.id.btnCleanFirestore)
         val adminDivider = findViewById<View>(R.id.adminDivider)
 
         if (isAdmin) {
             btnWipe.visibility = View.VISIBLE
+            btnClean.visibility = View.VISIBLE
             adminDivider.visibility = View.VISIBLE
+            
             btnWipe.setOnClickListener { confirmWipeServerData() }
-        }
-        
-        findViewById<MaterialButton>(R.id.btnCleanFirestore).setOnClickListener {
-            confirmWipeFirestoreData()
+            btnClean.setOnClickListener { confirmWipeFirestoreData() }
+        } else {
+            btnWipe.visibility = View.GONE
+            btnClean.visibility = View.GONE
+            adminDivider.visibility = View.GONE
         }
 
         findViewById<MaterialButton>(R.id.btnBackupCloud).setOnClickListener {
