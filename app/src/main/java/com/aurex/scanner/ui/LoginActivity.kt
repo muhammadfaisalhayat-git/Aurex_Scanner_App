@@ -227,16 +227,22 @@ class LoginActivity : BaseActivity() {
                             .addListenerForSingleValueEvent(object : ValueEventListener {
                                 override fun onDataChange(snapshot: DataSnapshot) {
                                     if (snapshot.exists()) {
-                                        val user = snapshot.getValue(User::class.java)
-                                        // Google login bypasses approval requirement
-                                        getSharedPreferences("AurexPrefs", MODE_PRIVATE).edit()
-                                            .putBoolean("rememberMe", true)
-                                            .putBoolean("isAdmin", user?.isAdmin ?: false)
-                                            .apply()
-                                        setLoading(false)
-                                        startMainActivity()
+                                        val userProfile = snapshot.getValue(User::class.java)
+                                        
+                                        if (userProfile?.isApproved == true) {
+                                            getSharedPreferences("AurexPrefs", MODE_PRIVATE).edit()
+                                                .putBoolean("rememberMe", true)
+                                                .putBoolean("isAdmin", userProfile.isAdmin)
+                                                .apply()
+                                            setLoading(false)
+                                            startMainActivity()
+                                        } else {
+                                            auth.signOut()
+                                            setLoading(false)
+                                            Toast.makeText(this@LoginActivity, "Google Account pending approval. Please contact administrator.", Toast.LENGTH_LONG).show()
+                                        }
                                     } else {
-                                        // New Google User - Auto-approved
+                                        // New Google User - Needs Approval (except admin email)
                                         val isAdmin = email.lowercase().trim() == "admin@aurex.com"
                                         val newUser = User(
                                             id = userId,
@@ -244,17 +250,36 @@ class LoginActivity : BaseActivity() {
                                             email = email,
                                             position = "Google User",
                                             isAdmin = isAdmin,
-                                            isApproved = true // Auto-approved for Google login
+                                            isApproved = isAdmin // Only admin auto-approved
                                         )
                                         
                                         FirebaseUtils.getDatabase().getReference("users").child(userId).setValue(newUser)
                                             .addOnSuccessListener {
-                                                getSharedPreferences("AurexPrefs", MODE_PRIVATE).edit()
-                                                    .putBoolean("rememberMe", true)
-                                                    .putBoolean("isAdmin", isAdmin)
-                                                    .apply()
-                                                setLoading(false)
-                                                startMainActivity()
+                                                if (isAdmin) {
+                                                    getSharedPreferences("AurexPrefs", MODE_PRIVATE).edit()
+                                                        .putBoolean("rememberMe", true)
+                                                        .putBoolean("isAdmin", true)
+                                                        .apply()
+                                                    setLoading(false)
+                                                    startMainActivity()
+                                                } else {
+                                                    // Notify Admin about new Google user
+                                                    val registrationNotif = com.aurex.scanner.data.Notification(
+                                                        title = "New Google User Registration",
+                                                        message = "User $email registered via Google.",
+                                                        type = "approval",
+                                                        actionData = userId
+                                                    )
+                                                    com.aurex.scanner.util.NotificationHelper.sendNotification("admin", registrationNotif)
+                                                    
+                                                    auth.signOut()
+                                                    setLoading(false)
+                                                    androidx.appcompat.app.AlertDialog.Builder(this@LoginActivity)
+                                                        .setTitle("Registration Successful")
+                                                        .setMessage("Your Google account is registered and pending administrator approval.")
+                                                        .setPositiveButton("OK", null)
+                                                        .show()
+                                                }
                                             }
                                     }
                                 }
