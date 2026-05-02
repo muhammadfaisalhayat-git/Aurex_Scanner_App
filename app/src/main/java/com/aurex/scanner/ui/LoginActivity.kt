@@ -2,6 +2,10 @@ package com.aurex.scanner.ui
 
 import android.content.Intent
 import android.os.Bundle
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withTimeoutOrNull
 import android.util.Log
 import android.view.View
 import android.widget.Button
@@ -115,40 +119,38 @@ class LoginActivity : BaseActivity() {
                         Toast.makeText(this, "Please enter warehouse details", Toast.LENGTH_SHORT).show()
                         return@setOnClickListener
                     }
-                    auth.createUserWithEmailAndPassword(email, pass).addOnCompleteListener { task ->
-                        if (task.isSuccessful) {
+                    lifecycleScope.launch {
+                        try {
+                            val task = auth.createUserWithEmailAndPassword(email, pass).await()
                             val userId = auth.currentUser?.uid ?: ""
                             val isAdmin = email.lowercase().trim() == "admin@aurex.com"
                             
-                            // Create user profile in Database - isApproved is false by default
                             val userProfile = User(
                                 id = userId, 
                                 name = email.split("@")[0], 
                                 email = email, 
                                 position = wName, 
                                 isAdmin = isAdmin,
-                                isApproved = isAdmin // Admin is auto-approved
+                                isApproved = isAdmin
                             )
-                            FirebaseUtils.getDatabase().getReference("users").child(userId).setValue(userProfile)
-                                .addOnSuccessListener {
-                                    if (!isAdmin) {
-                                        // Send notification to admin for new registration
-                                        val registrationNotif = com.aurex.scanner.data.Notification(
-                                            title = "New User Registration",
-                                            message = "User $email is requesting access.",
-                                            type = "approval",
-                                            actionData = userId
-                                        )
-                                        com.aurex.scanner.util.NotificationHelper.sendNotification("admin", registrationNotif)
-                                        
-                                        // Show local push notification for registration
-                                        com.aurex.scanner.util.NotificationHelper.showSystemNotification(
-                                            this@LoginActivity,
-                                            "Registration Successful",
-                                            "Pending admin approval. You will be notified once approved."
-                                        )
-                                    }
-                                }
+                            
+                            FirebaseUtils.getDatabase().getReference("users").child(userId).setValue(userProfile).await()
+                            
+                            if (!isAdmin) {
+                                val registrationNotif = com.aurex.scanner.data.Notification(
+                                    title = "New User Registration",
+                                    message = "User $email is requesting access.",
+                                    type = "approval",
+                                    actionData = userId
+                                )
+                                com.aurex.scanner.util.NotificationHelper.sendNotification("admin", registrationNotif)
+                                
+                                com.aurex.scanner.util.NotificationHelper.showSystemNotification(
+                                    this@LoginActivity,
+                                    "Registration Successful",
+                                    "Pending admin approval. You will be notified once approved."
+                                )
+                            }
 
                             if (isAdmin) {
                                 prefs.edit()
@@ -159,7 +161,6 @@ class LoginActivity : BaseActivity() {
                                     .apply()
                                 setLoading(false)
                                 
-                                // Show local push notification for login
                                 com.aurex.scanner.util.NotificationHelper.showSystemNotification(
                                     this@LoginActivity,
                                     "Login Successful",
@@ -170,22 +171,21 @@ class LoginActivity : BaseActivity() {
                             } else {
                                 auth.signOut()
                                 setLoading(false)
-                                androidx.appcompat.app.AlertDialog.Builder(this)
+                                androidx.appcompat.app.AlertDialog.Builder(this@LoginActivity)
                                     .setTitle("Registration Successful")
                                     .setMessage("Your account has been created and is pending admin approval. You will be able to login once approved.")
                                     .setPositiveButton("OK", null)
                                     .show()
                                 
-                                // Reset UI to login mode
                                 isRegistering = false
                                 warehouseNameEdit.visibility = View.GONE
                                 warehouseCodeEdit.visibility = View.GONE
                                 btnLogin.text = "Login"
                                 btnRegister.text = "Register"
                             }
-                        } else {
+                        } catch (e: Exception) {
                             setLoading(false)
-                            Toast.makeText(this, "Registration Failed: ${task.exception?.message}", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(this@LoginActivity, "Registration Failed: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
                         }
                     }
                 } else {
@@ -219,100 +219,83 @@ class LoginActivity : BaseActivity() {
             try {
                 val account = task.getResult(com.google.android.gms.common.api.ApiException::class.java)!!
                 val credential = GoogleAuthProvider.getCredential(account.idToken, null)
-                
-                // Show loading ONLY after account is selected to avoid "blank loading" delay
                 setLoading(true)
-                
-                auth.signInWithCredential(credential).addOnCompleteListener { taskResult ->
-                    if (taskResult.isSuccessful) {
-                        val user = auth.currentUser
+
+                lifecycleScope.launch {
+                    try {
+                        val authResult = auth.signInWithCredential(credential).await()
+                        val user = authResult.user
                         val userId = user?.uid ?: ""
                         val email = user?.email ?: ""
-                        
-                        // Use a timeout for the database check just like in performLogin
-                        val handler = android.os.Handler(android.os.Looper.getMainLooper())
-                        val timeoutRunnable = Runnable {
-                            if (loginProgress.visibility == View.VISIBLE) {
+
+                        // Fetch profile with a robust timeout
+                        val userRef = FirebaseUtils.getDatabase().getReference("users").child(userId)
+                        val snapshot = withTimeoutOrNull(20000L) {
+                            userRef.get().await()
+                        }
+
+                        if (snapshot == null) {
+                            setLoading(false)
+                            auth.signOut()
+                            Toast.makeText(this@LoginActivity, "Server busy. Please try again.", Toast.LENGTH_LONG).show()
+                            return@launch
+                        }
+
+                        if (snapshot.exists()) {
+                            val userProfile = snapshot.getValue(User::class.java)
+                            if (userProfile?.isApproved == true) {
+                                getSharedPreferences("AurexPrefs", MODE_PRIVATE).edit()
+                                    .putBoolean("rememberMe", true)
+                                    .putBoolean("isAdmin", userProfile.isAdmin)
+                                    .apply()
                                 setLoading(false)
+                                startMainActivity()
+                            } else {
                                 auth.signOut()
-                                Toast.makeText(this, "Verification timeout. Please try again.", Toast.LENGTH_LONG).show()
+                                setLoading(false)
+                                Toast.makeText(this@LoginActivity, "Account pending approval. Please contact administrator.", Toast.LENGTH_LONG).show()
+                            }
+                        } else {
+                            // New User Registration
+                            val isAdmin = email.lowercase().trim() == "admin@aurex.com"
+                            val newUser = User(
+                                id = userId,
+                                name = account.displayName ?: (account.givenName + " " + account.familyName).trim().ifEmpty { email.split("@")[0] },
+                                email = email,
+                                position = "Google User",
+                                isAdmin = isAdmin,
+                                isApproved = isAdmin
+                            )
+                            
+                            userRef.setValue(newUser).await()
+                            
+                            setLoading(false)
+                            if (isAdmin) {
+                                getSharedPreferences("AurexPrefs", MODE_PRIVATE).edit()
+                                    .putBoolean("rememberMe", true)
+                                    .putBoolean("isAdmin", true)
+                                    .apply()
+                                startMainActivity()
+                            } else {
+                                com.aurex.scanner.util.NotificationHelper.sendNotification("admin", com.aurex.scanner.data.Notification(
+                                    title = "New Google User",
+                                    message = "User $email is requesting access.",
+                                    type = "approval",
+                                    actionData = userId
+                                ))
+                                auth.signOut()
+                                androidx.appcompat.app.AlertDialog.Builder(this@LoginActivity)
+                                    .setTitle("Registration Successful")
+                                    .setMessage("Account created and pending administrator approval.")
+                                    .setPositiveButton("OK", null)
+                                    .show()
                             }
                         }
-                        handler.postDelayed(timeoutRunnable, 15000)
-
-                        FirebaseUtils.getDatabase().getReference("users").child(userId)
-                            .addListenerForSingleValueEvent(object : ValueEventListener {
-                                override fun onDataChange(snapshot: DataSnapshot) {
-                                    handler.removeCallbacks(timeoutRunnable)
-                                    if (!isDestroyed && !isFinishing) {
-                                        if (snapshot.exists()) {
-                                            val userProfile = snapshot.getValue(User::class.java)
-                                            if (userProfile?.isApproved == true) {
-                                                getSharedPreferences("AurexPrefs", MODE_PRIVATE).edit()
-                                                    .putBoolean("rememberMe", true)
-                                                    .putBoolean("isAdmin", userProfile.isAdmin)
-                                                    .apply()
-                                                setLoading(false)
-                                                startMainActivity()
-                                            } else {
-                                                auth.signOut()
-                                                setLoading(false)
-                                                Toast.makeText(this@LoginActivity, "Account pending approval. Please contact administrator.", Toast.LENGTH_LONG).show()
-                                            }
-                                        } else {
-                                            // New User Registration
-                                            val isAdmin = email.lowercase().trim() == "admin@aurex.com"
-                                            val newUser = User(
-                                                id = userId,
-                                                name = account.displayName ?: (account.givenName + " " + account.familyName).trim().ifEmpty { email.split("@")[0] },
-                                                email = email,
-                                                position = "Google User",
-                                                isAdmin = isAdmin,
-                                                isApproved = isAdmin
-                                            )
-                                            
-                                            FirebaseUtils.getDatabase().getReference("users").child(userId).setValue(newUser)
-                                                .addOnSuccessListener {
-                                                    setLoading(false)
-                                                    if (isAdmin) {
-                                                        getSharedPreferences("AurexPrefs", MODE_PRIVATE).edit()
-                                                            .putBoolean("rememberMe", true)
-                                                            .putBoolean("isAdmin", true)
-                                                            .apply()
-                                                        startMainActivity()
-                                                    } else {
-                                                        com.aurex.scanner.util.NotificationHelper.sendNotification("admin", com.aurex.scanner.data.Notification(
-                                                            title = "New Google User",
-                                                            message = "User $email is requesting access.",
-                                                            type = "approval",
-                                                            actionData = userId
-                                                        ))
-                                                        auth.signOut()
-                                                        androidx.appcompat.app.AlertDialog.Builder(this@LoginActivity)
-                                                            .setTitle("Registration Successful")
-                                                            .setMessage("Account created and pending administrator approval.")
-                                                            .setPositiveButton("OK", null)
-                                                            .show()
-                                                    }
-                                                }
-                                                .addOnFailureListener {
-                                                    setLoading(false)
-                                                    auth.signOut()
-                                                    Toast.makeText(this@LoginActivity, "Failed to create profile", Toast.LENGTH_SHORT).show()
-                                                }
-                                        }
-                                    }
-                                }
-                                override fun onCancelled(error: DatabaseError) {
-                                    handler.removeCallbacks(timeoutRunnable)
-                                    setLoading(false)
-                                    auth.signOut()
-                                    Toast.makeText(this@LoginActivity, "Database Error", Toast.LENGTH_SHORT).show()
-                                }
-                            })
-                    } else {
+                    } catch (e: Exception) {
                         setLoading(false)
-                        Toast.makeText(this@LoginActivity, "Authentication Failed", Toast.LENGTH_SHORT).show()
+                        auth.signOut()
+                        Log.e("LoginActivity", "Google Sign-In Task Failed", e)
+                        Toast.makeText(this@LoginActivity, "Sign-In Failed: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
                     }
                 }
             } catch (e: com.google.android.gms.common.api.ApiException) {
@@ -322,7 +305,7 @@ class LoginActivity : BaseActivity() {
                 }
             } catch (e: Exception) {
                 setLoading(false)
-                Toast.makeText(this, "An error occurred", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "An unexpected error occurred", Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -331,8 +314,9 @@ class LoginActivity : BaseActivity() {
         val prefs = getSharedPreferences("AurexPrefs", MODE_PRIVATE)
         setLoading(true)
         
-        auth.signInWithEmailAndPassword(email, pass).addOnCompleteListener { task ->
-            if (task.isSuccessful) {
+        lifecycleScope.launch {
+            try {
+                auth.signInWithEmailAndPassword(email, pass).await()
                 val user = auth.currentUser
                 val userId = user?.uid ?: ""
                 val emailTrimmed = email.lowercase().trim()
@@ -347,68 +331,41 @@ class LoginActivity : BaseActivity() {
                         .apply()
                     setLoading(false)
                     startMainActivity()
-                    return@addOnCompleteListener
+                    return@launch
                 }
 
-                // For regular users, check approval status with a fallback/timeout
+                // Check profile
                 val userRef = FirebaseUtils.getDatabase().getReference("users").child(userId)
-                
-                // Set a timeout for the database check
-                val handler = android.os.Handler(android.os.Looper.getMainLooper())
-                val timeoutRunnable = Runnable {
-                    if (loginProgress.visibility == View.VISIBLE) {
-                        setLoading(false)
-                        Toast.makeText(this, "Server check timed out. Please try again or contact admin.", Toast.LENGTH_LONG).show()
-                        auth.signOut()
-                    }
+                val snapshot = withTimeoutOrNull(20000L) {
+                    userRef.get().await()
                 }
-                handler.postDelayed(timeoutRunnable, 15000) // 15 seconds timeout
 
-                userRef.addListenerForSingleValueEvent(object : ValueEventListener {
-                    override fun onDataChange(snapshot: DataSnapshot) {
-                        handler.removeCallbacks(timeoutRunnable)
-                        if (!isDestroyed && !isFinishing) {
-                            val userProfile = snapshot.getValue(User::class.java)
-                            
-                            if (userProfile?.isApproved == true) {
-                                val isAdmin = userProfile.isAdmin
-                                
-                                prefs.edit()
-                                    .putBoolean("rememberMe", rememberMe)
-                                    .putBoolean("isAdmin", isAdmin)
-                                    .putString("savedEmail", email)
-                                    .putString("savedPass", pass)
-                                    .apply()
-                                setLoading(false)
-                                
-                                com.aurex.scanner.util.NotificationHelper.showSystemNotification(
-                                    this@LoginActivity,
-                                    "Login Successful",
-                                    "Welcome back to Aurex Scanner!"
-                                )
+                if (snapshot == null) {
+                    setLoading(false)
+                    auth.signOut()
+                    Toast.makeText(this@LoginActivity, "Connection timeout. Please try again.", Toast.LENGTH_LONG).show()
+                    return@launch
+                }
 
-                                startMainActivity()
-                            } else {
-                                auth.signOut()
-                                setLoading(false)
-                                Toast.makeText(this@LoginActivity, "Account pending approval. Please contact administrator.", Toast.LENGTH_LONG).show()
-                            }
-                        }
-                    }
-
-                    override fun onCancelled(error: DatabaseError) {
-                        handler.removeCallbacks(timeoutRunnable)
-                        if (!isDestroyed && !isFinishing) {
-                            auth.signOut()
-                            setLoading(false)
-                            Toast.makeText(this@LoginActivity, "Database Error: ${error.message}", Toast.LENGTH_SHORT).show()
-                        }
-                    }
-                })
-            } else {
+                val userProfile = snapshot.getValue(User::class.java)
+                if (userProfile?.isApproved == true) {
+                    prefs.edit()
+                        .putBoolean("rememberMe", rememberMe)
+                        .putBoolean("isAdmin", userProfile.isAdmin)
+                        .putString("savedEmail", email)
+                        .putString("savedPass", pass)
+                        .apply()
+                    setLoading(false)
+                    startMainActivity()
+                } else {
+                    auth.signOut()
+                    setLoading(false)
+                    Toast.makeText(this@LoginActivity, "Account pending approval. Please contact administrator.", Toast.LENGTH_LONG).show()
+                }
+            } catch (e: Exception) {
                 setLoading(false)
-                val errorMsg = task.exception?.message ?: "Login Failed"
-                Toast.makeText(this, errorMsg, Toast.LENGTH_SHORT).show()
+                val errorMsg = e.localizedMessage ?: "Login Failed"
+                Toast.makeText(this@LoginActivity, errorMsg, Toast.LENGTH_SHORT).show()
             }
         }
     }
