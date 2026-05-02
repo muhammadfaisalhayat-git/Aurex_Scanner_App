@@ -153,41 +153,6 @@
                                 android:textStyle="bold" />
                         </LinearLayout>
                     </com.google.android.material.card.MaterialCardView>
-
-                    <com.google.android.material.card.MaterialCardView
-                        android:id="@+id/cardPendingUsers"
-                        android:layout_width="110dp"
-                        android:layout_height="wrap_content"
-                        android:layout_margin="4dp"
-                        app:cardElevation="4dp"
-                        app:cardCornerRadius="12dp"
-                        app:cardBackgroundColor="#9C27B0"
-                        android:clickable="true"
-                        android:focusable="true">
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:orientation="vertical"
-                            android:padding="16dp"
-                            android:gravity="center">
-                            <TextView
-                                android:id="@+id/txtPendingCount"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="0"
-                                android:textColor="@android:color/white"
-                                android:textSize="24sp"
-                                android:textStyle="bold" />
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="PENDING"
-                                android:textColor="@android:color/white"
-                                android:textSize="10sp"
-                                android:textAllCaps="true"
-                                android:textStyle="bold" />
-                        </LinearLayout>
-                    </com.google.android.material.card.MaterialCardView>
                 </LinearLayout>
             </HorizontalScrollView>
 
@@ -321,7 +286,6 @@
             </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
         </LinearLayout>
 
-        <!-- Users Section -->
         <LinearLayout
             android:id="@+id/layoutUsers"
             android:layout_width="match_parent"
@@ -329,14 +293,60 @@
             android:orientation="vertical"
             android:visibility="gone">
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnAddUser"
-                android:layout_width="wrap_content"
+            <LinearLayout
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_gravity="end"
-                android:layout_margin="16dp"
-                android:text="@string/add_user"
-                app:icon="@android:drawable/ic_menu_add" />
+                android:orientation="horizontal"
+                android:padding="16dp"
+                android:gravity="center_vertical">
+
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/cardPendingUsers"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    app:cardElevation="4dp"
+                    app:cardCornerRadius="12dp"
+                    app:cardBackgroundColor="#9C27B0">
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:paddingHorizontal="16dp"
+                        android:paddingVertical="8dp"
+                        android:gravity="center">
+                        <TextView
+                            android:id="@+id/txtPendingCount"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="0"
+                            android:textColor="@android:color/white"
+                            android:textSize="18sp"
+                            android:textStyle="bold" />
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="8dp"
+                            android:text="PENDING APPROVALS"
+                            android:textColor="@android:color/white"
+                            android:textSize="12sp"
+                            android:textAllCaps="true"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <View
+                    android:layout_width="0dp"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"/>
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnAddUser"
+                    style="@style/Widget.MaterialComponents.Button.TextButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/add_user"
+                    app:icon="@android:drawable/ic_menu_add" />
+            </LinearLayout>
 
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/rvAdminUsers"

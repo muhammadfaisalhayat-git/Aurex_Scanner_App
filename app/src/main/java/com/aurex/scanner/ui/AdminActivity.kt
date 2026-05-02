@@ -132,7 +132,7 @@ class AdminActivity : BaseActivity() {
                     message = "Your account has been approved by the administrator.",
                     type = "info"
                 ))
-                resetUserPassword(user.email) // Send reset link so they can set password
+                resetUserPassword(user.email)
             }
     }
 
@@ -168,6 +168,8 @@ class AdminActivity : BaseActivity() {
             updateFilteredList()
         }
         cardPendingUsers.setOnClickListener {
+            // Now clicking it while in the Users tab can maybe filter for pending users only
+            // For now, let's just make sure it stays on the users tab
             tabs.getTabAt(1)?.select()
         }
     }
@@ -245,7 +247,6 @@ class AdminActivity : BaseActivity() {
                     }
                 }
                 txtPendingCount.text = pendingCount.toString()
-                cardPendingUsers.visibility = if (pendingCount > 0) View.VISIBLE else View.VISIBLE // Keep visible but update count
                 
                 usersList.sortWith(compareBy({ it.isApproved }, { it.name }))
                 userAdapter.notifyDataSetChanged()

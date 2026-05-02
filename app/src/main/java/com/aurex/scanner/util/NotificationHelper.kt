@@ -4,8 +4,7 @@ import com.aurex.scanner.data.Notification
 import com.google.firebase.database.FirebaseDatabase
 
 object NotificationHelper {
-    private const val DATABASE_URL = "https://aurexscannerapp-default-rtdb.firebaseio.com"
-    private val db = FirebaseDatabase.getInstance(DATABASE_URL).getReference("notifications")
+    private val db = FirebaseUtils.getDatabase().getReference("notifications")
 
     /**
      * Sends a notification to a specific user and ALWAYS copies it to the admin feed.
