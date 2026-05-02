@@ -39,120 +39,157 @@
             android:orientation="vertical"
             android:visibility="visible">
 
-            <LinearLayout
+            <HorizontalScrollView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:padding="8dp">
-
-                <com.google.android.material.card.MaterialCardView
-                    android:id="@+id/cardTotalItems"
-                    android:layout_width="0dp"
+                android:scrollbars="none">
+                <LinearLayout
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_margin="4dp"
-                    app:cardElevation="4dp"
-                    app:cardCornerRadius="12dp"
-                    app:cardBackgroundColor="@color/primary"
-                    android:clickable="true"
-                    android:focusable="true">
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="vertical"
-                        android:padding="16dp"
-                        android:gravity="center">
-                        <TextView
-                            android:id="@+id/txtTotalProducts"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="0"
-                            android:textColor="@android:color/white"
-                            android:textSize="28sp"
-                            android:textStyle="bold" />
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/total_items"
-                            android:textColor="@android:color/white"
-                            android:textSize="12sp"
-                            android:textAllCaps="true"
-                            android:textStyle="bold" />
-                    </LinearLayout>
-                </com.google.android.material.card.MaterialCardView>
+                    android:orientation="horizontal"
+                    android:padding="8dp">
 
-                <com.google.android.material.card.MaterialCardView
-                    android:id="@+id/cardExpiredItems"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_margin="4dp"
-                    app:cardElevation="4dp"
-                    app:cardCornerRadius="12dp"
-                    app:cardBackgroundColor="#E53935"
-                    android:clickable="true"
-                    android:focusable="true">
-                    <LinearLayout
-                        android:layout_width="match_parent"
+                    <com.google.android.material.card.MaterialCardView
+                        android:id="@+id/cardTotalItems"
+                        android:layout_width="110dp"
                         android:layout_height="wrap_content"
-                        android:orientation="vertical"
-                        android:padding="16dp"
-                        android:gravity="center">
-                        <TextView
-                            android:id="@+id/txtExpiredCount"
-                            android:layout_width="wrap_content"
+                        android:layout_margin="4dp"
+                        app:cardElevation="4dp"
+                        app:cardCornerRadius="12dp"
+                        app:cardBackgroundColor="@color/primary"
+                        android:clickable="true"
+                        android:focusable="true">
+                        <LinearLayout
+                            android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:text="0"
-                            android:textColor="@android:color/white"
-                            android:textSize="28sp"
-                            android:textStyle="bold" />
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/expired"
-                            android:textColor="@android:color/white"
-                            android:textSize="12sp"
-                            android:textAllCaps="true"
-                            android:textStyle="bold" />
-                    </LinearLayout>
-                </com.google.android.material.card.MaterialCardView>
+                            android:orientation="vertical"
+                            android:padding="16dp"
+                            android:gravity="center">
+                            <TextView
+                                android:id="@+id/txtTotalProducts"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="0"
+                                android:textColor="@android:color/white"
+                                android:textSize="24sp"
+                                android:textStyle="bold" />
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/total_items"
+                                android:textColor="@android:color/white"
+                                android:textSize="10sp"
+                                android:textAllCaps="true"
+                                android:textStyle="bold" />
+                        </LinearLayout>
+                    </com.google.android.material.card.MaterialCardView>
 
-                <com.google.android.material.card.MaterialCardView
-                    android:id="@+id/cardNearExpiryItems"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_margin="4dp"
-                    app:cardElevation="4dp"
-                    app:cardCornerRadius="12dp"
-                    app:cardBackgroundColor="#FF9800"
-                    android:clickable="true"
-                    android:focusable="true">
-                    <LinearLayout
-                        android:layout_width="match_parent"
+                    <com.google.android.material.card.MaterialCardView
+                        android:id="@+id/cardExpiredItems"
+                        android:layout_width="110dp"
                         android:layout_height="wrap_content"
-                        android:orientation="vertical"
-                        android:padding="16dp"
-                        android:gravity="center">
-                        <TextView
-                            android:id="@+id/txtNearExpiryCount"
-                            android:layout_width="wrap_content"
+                        android:layout_margin="4dp"
+                        app:cardElevation="4dp"
+                        app:cardCornerRadius="12dp"
+                        app:cardBackgroundColor="#E53935"
+                        android:clickable="true"
+                        android:focusable="true">
+                        <LinearLayout
+                            android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:text="0"
-                            android:textColor="@android:color/white"
-                            android:textSize="28sp"
-                            android:textStyle="bold" />
-                        <TextView
-                            android:layout_width="wrap_content"
+                            android:orientation="vertical"
+                            android:padding="16dp"
+                            android:gravity="center">
+                            <TextView
+                                android:id="@+id/txtExpiredCount"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="0"
+                                android:textColor="@android:color/white"
+                                android:textSize="24sp"
+                                android:textStyle="bold" />
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/expired"
+                                android:textColor="@android:color/white"
+                                android:textSize="10sp"
+                                android:textAllCaps="true"
+                                android:textStyle="bold" />
+                        </LinearLayout>
+                    </com.google.android.material.card.MaterialCardView>
+
+                    <com.google.android.material.card.MaterialCardView
+                        android:id="@+id/cardNearExpiryItems"
+                        android:layout_width="110dp"
+                        android:layout_height="wrap_content"
+                        android:layout_margin="4dp"
+                        app:cardElevation="4dp"
+                        app:cardCornerRadius="12dp"
+                        app:cardBackgroundColor="#FF9800"
+                        android:clickable="true"
+                        android:focusable="true">
+                        <LinearLayout
+                            android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:text="@string/near_expiry"
-                            android:textColor="@android:color/white"
-                            android:textSize="12sp"
-                            android:textAllCaps="true"
-                            android:textStyle="bold" />
-                    </LinearLayout>
-                </com.google.android.material.card.MaterialCardView>
-            </LinearLayout>
+                            android:orientation="vertical"
+                            android:padding="16dp"
+                            android:gravity="center">
+                            <TextView
+                                android:id="@+id/txtNearExpiryCount"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="0"
+                                android:textColor="@android:color/white"
+                                android:textSize="24sp"
+                                android:textStyle="bold" />
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/near_expiry"
+                                android:textColor="@android:color/white"
+                                android:textSize="10sp"
+                                android:textAllCaps="true"
+                                android:textStyle="bold" />
+                        </LinearLayout>
+                    </com.google.android.material.card.MaterialCardView>
+
+                    <com.google.android.material.card.MaterialCardView
+                        android:id="@+id/cardPendingUsers"
+                        android:layout_width="110dp"
+                        android:layout_height="wrap_content"
+                        android:layout_margin="4dp"
+                        app:cardElevation="4dp"
+                        app:cardCornerRadius="12dp"
+                        app:cardBackgroundColor="#9C27B0"
+                        android:clickable="true"
+                        android:focusable="true">
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="vertical"
+                            android:padding="16dp"
+                            android:gravity="center">
+                            <TextView
+                                android:id="@+id/txtPendingCount"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="0"
+                                android:textColor="@android:color/white"
+                                android:textSize="24sp"
+                                android:textStyle="bold" />
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="PENDING"
+                                android:textColor="@android:color/white"
+                                android:textSize="10sp"
+                                android:textAllCaps="true"
+                                android:textStyle="bold" />
+                        </LinearLayout>
+                    </com.google.android.material.card.MaterialCardView>
+                </LinearLayout>
+            </HorizontalScrollView>
 
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/cardAdvancedAnalytics"

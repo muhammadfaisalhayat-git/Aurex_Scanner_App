@@ -75,6 +75,15 @@
         </LinearLayout>
 
         <ImageButton
+            android:id="@+id/btnApproveUser"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@android:drawable/checkbox_on_background"
+            app:tint="#4CAF50"
+            android:visibility="gone" />
+
+        <ImageButton
             android:id="@+id/btnEditUser"
             android:layout_width="48dp"
             android:layout_height="48dp"

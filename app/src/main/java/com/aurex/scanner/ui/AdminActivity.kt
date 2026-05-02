@@ -5,11 +5,9 @@ import android.os.Bundle
 import android.view.View
 import android.widget.*
 import androidx.appcompat.app.AlertDialog
-import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.aurex.scanner.R
 import com.aurex.scanner.UserAdapter
 import com.aurex.scanner.ProductAdapter
@@ -18,7 +16,6 @@ import com.aurex.scanner.scanner.TextParser
 import com.google.android.material.tabs.TabLayout
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.*
-import com.google.firebase.firestore.FirebaseFirestore
 import com.aurex.scanner.util.FirebaseUtils
 import com.aurex.scanner.util.NotificationHelper
 import kotlinx.coroutines.Dispatchers
@@ -40,10 +37,12 @@ class AdminActivity : BaseActivity() {
     private lateinit var txtTotal: TextView
     private lateinit var txtExpired: TextView
     private lateinit var txtNearExpiry: TextView
+    private lateinit var txtPendingCount: TextView
 
     private lateinit var cardTotal: View
     private lateinit var cardExpired: View
     private lateinit var cardNearExpiry: View
+    private lateinit var cardPendingUsers: View
 
     private lateinit var layoutAnalyticsContent: View
     private lateinit var imgExpandAnalytics: ImageView
@@ -74,10 +73,12 @@ class AdminActivity : BaseActivity() {
         txtTotal = findViewById(R.id.txtTotalProducts)
         txtExpired = findViewById(R.id.txtExpiredCount)
         txtNearExpiry = findViewById(R.id.txtNearExpiryCount)
+        txtPendingCount = findViewById(R.id.txtPendingCount)
         
         cardTotal = findViewById(R.id.cardTotalItems)
         cardExpired = findViewById(R.id.cardExpiredItems)
         cardNearExpiry = findViewById(R.id.cardNearExpiryItems)
+        cardPendingUsers = findViewById(R.id.cardPendingUsers)
         
         layoutAnalyticsContent = findViewById(R.id.layoutAnalyticsContent)
         imgExpandAnalytics = findViewById(R.id.imgExpandAnalytics)
@@ -97,7 +98,8 @@ class AdminActivity : BaseActivity() {
         
         userAdapter = UserAdapter(usersList, 
             onEdit = { user -> showUserDialog(user) },
-            onDelete = { user -> confirmDeleteUser(user) }
+            onDelete = { user -> confirmDeleteUser(user) },
+            onApprove = { user -> approveUser(user) }
         )
         rvUsers.adapter = userAdapter
 
@@ -117,7 +119,21 @@ class AdminActivity : BaseActivity() {
         val toolbar = findViewById<androidx.appcompat.widget.Toolbar>(R.id.toolbar)
         setSupportActionBar(toolbar)
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
-        supportActionBar?.setHomeAsUpIndicator(android.R.drawable.ic_menu_today) // Another common icon
+        supportActionBar?.setHomeAsUpIndicator(android.R.drawable.ic_menu_today)
+    }
+
+    private fun approveUser(user: User) {
+        val updatedUser = user.copy(isApproved = true)
+        usersRef.child(user.id).setValue(updatedUser)
+            .addOnSuccessListener {
+                Toast.makeText(this, "${user.name} approved successfully", Toast.LENGTH_SHORT).show()
+                NotificationHelper.sendNotification(user.id, Notification(
+                    title = "Account Approved!",
+                    message = "Your account has been approved by the administrator.",
+                    type = "info"
+                ))
+                resetUserPassword(user.email) // Send reset link so they can set password
+            }
     }
 
     override fun onCreateOptionsMenu(menu: android.view.Menu): Boolean {
@@ -151,6 +167,9 @@ class AdminActivity : BaseActivity() {
             currentFilter = "near_expiry"
             updateFilteredList()
         }
+        cardPendingUsers.setOnClickListener {
+            tabs.getTabAt(1)?.select()
+        }
     }
 
     private fun updateFilteredList() {
@@ -172,7 +191,6 @@ class AdminActivity : BaseActivity() {
             onViewImage = {}
         )
         
-        // Optional: Visual feedback for active filter
         cardTotal.alpha = if (currentFilter == "all") 1.0f else 0.6f
         cardExpired.alpha = if (currentFilter == "expired") 1.0f else 0.6f
         cardNearExpiry.alpha = if (currentFilter == "near_expiry") 1.0f else 0.6f
@@ -211,23 +229,24 @@ class AdminActivity : BaseActivity() {
         usersRef.addValueEventListener(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 usersList.clear()
+                var pendingCount = 0
                 for (child in snapshot.children) {
                     try {
                         val user = child.getValue(User::class.java)
                         if (user != null) {
                             user.id = child.key ?: ""
-                            
-                            // Fetch daily scans for this user
                             val dailyScans = child.child("dailyActivity").child(today).child("scans").getValue(Int::class.java) ?: 0
                             user.dailyScans = dailyScans
-
                             usersList.add(user)
+                            if (!user.isApproved && !user.isAdmin) pendingCount++
                         }
                     } catch (e: Exception) {
                         android.util.Log.e("AdminActivity", "Error parsing user: ${child.key}", e)
                     }
                 }
-                // Sort users: Unapproved first, then by name
+                txtPendingCount.text = pendingCount.toString()
+                cardPendingUsers.visibility = if (pendingCount > 0) View.VISIBLE else View.VISIBLE // Keep visible but update count
+                
                 usersList.sortWith(compareBy({ it.isApproved }, { it.name }))
                 userAdapter.notifyDataSetChanged()
             }
@@ -248,14 +267,11 @@ class AdminActivity : BaseActivity() {
         if (user != null) {
             editName.setText(user.name)
             editEmail.setText(user.email)
-            editEmail.isEnabled = false // Don't change email for existing user
-            editPass.visibility = View.GONE // Don't show password for edit
+            editEmail.isEnabled = false
+            editPass.visibility = View.GONE
             editPos.setText(user.position)
             cbIsAdmin.isChecked = user.isAdmin
-            
-            if (!user.isApproved) {
-                cbIsAdmin.visibility = View.GONE // Hide admin toggle for unapproved users
-            }
+            if (!user.isApproved) cbIsAdmin.visibility = View.GONE
         }
 
         val dialog = AlertDialog.Builder(this)
@@ -285,17 +301,15 @@ class AdminActivity : BaseActivity() {
                     val updatedUser = user.copy(name = name, position = pos, isAdmin = isAdmin, isApproved = true)
                     usersRef.child(user.id).setValue(updatedUser)
                         .addOnSuccessListener {
-                            // Send congratulations email
-                            resetUserPassword(user.email)
-                            Toast.makeText(this, "User approved and email sent", Toast.LENGTH_SHORT).show()
-                            
-                            // Send a personal notification to the user
-                            val congratsNotif = com.aurex.scanner.data.Notification(
-                                title = "Account Approved!",
-                                message = "Congratulations! Your account has been approved. You can now access all features.",
-                                type = "info"
-                            )
-                            com.aurex.scanner.util.NotificationHelper.sendNotification(user.id, congratsNotif)
+                            Toast.makeText(this, "User updated", Toast.LENGTH_SHORT).show()
+                            if (!user.isApproved) {
+                                NotificationHelper.sendNotification(user.id, Notification(
+                                    title = "Account Approved!",
+                                    message = "Your account has been approved. You can now login.",
+                                    type = "info"
+                                ))
+                                resetUserPassword(user.email)
+                            }
                         }
                     dialog.dismiss()
                 }
@@ -307,7 +321,6 @@ class AdminActivity : BaseActivity() {
                 resetUserPassword(user.email)
             }
         }
-
         dialog.show()
     }
 
@@ -322,11 +335,10 @@ class AdminActivity : BaseActivity() {
     }
 
     private fun createUser(name: String, email: String, pass: String, position: String, isAdmin: Boolean) {
-        // Create user in Firebase Auth
         FirebaseAuth.getInstance().createUserWithEmailAndPassword(email, pass)
             .addOnSuccessListener { result ->
                 val userId = result.user?.uid ?: return@addOnSuccessListener
-                val newUser = User(id = userId, name = name, email = email, position = position, isAdmin = isAdmin)
+                val newUser = User(id = userId, name = name, email = email, position = position, isAdmin = isAdmin, isApproved = true)
                 usersRef.child(userId).setValue(newUser)
                 Toast.makeText(this, "User created successfully", Toast.LENGTH_SHORT).show()
             }
@@ -349,11 +361,9 @@ class AdminActivity : BaseActivity() {
     private fun loadDashboardData() {
         val db = AppDatabase.getDatabase(this)
         lifecycleScope.launch(Dispatchers.IO) {
-            // Load local data first for immediate display
             allAdminProducts = db.productDao().getAllList()
             updateDashboardUI()
 
-            // Fetch remote data from all users in RTDB
             val usersRef = FirebaseUtils.getDatabase().getReference("users")
             usersRef.addListenerForSingleValueEvent(object : ValueEventListener {
                 override fun onDataChange(snapshot: DataSnapshot) {
@@ -385,7 +395,7 @@ class AdminActivity : BaseActivity() {
                             }
                         } else {
                             withContext(Dispatchers.Main) {
-                                updateDashboardUI() // Still update to show local if no remote
+                                updateDashboardUI()
                                 swipeRefresh.isRefreshing = false
                             }
                         }
@@ -433,7 +443,6 @@ class AdminActivity : BaseActivity() {
 
         if (allAdminProducts.isEmpty()) return
 
-        // 1. Status Donut (Interactive: Click slices to filter list)
         val expired = allAdminProducts.count { TextParser.isExpired(it.expDate) }.toFloat()
         val near = allAdminProducts.count { TextParser.isNearExpiry(it.expDate) }.toFloat()
         val good = (allAdminProducts.size - expired - near)
@@ -448,26 +457,20 @@ class AdminActivity : BaseActivity() {
             updateFilteredList()
         })
 
-        // 2. Category Pie (Measure: Product count per category)
         val catMap = allAdminProducts.groupBy { it.category ?: getString(R.string.general) }
         val catGroups = if (catMap.isEmpty() && allAdminProducts.isNotEmpty()) mapOf(getString(R.string.general) to emptyList<Product>()) else catMap
         val catColors = listOf("#7C4DFF", "#448AFF", "#00BCD4", "#00E676", "#FFEB3B", "#FF5252")
         val catData = catGroups.entries.sortedByDescending { it.value.size }.take(5).mapIndexed { index, entry ->
             ChartSlice(entry.key, entry.value.size.toFloat(), Color.parseColor(catColors[index % catColors.size]), entry.key)
         }
-        chartPieCategory.addView(PremiumChartView(this, catData, isDonut = false) { cat ->
-            // Filter list by category if needed
-        })
+        chartPieCategory.addView(PremiumChartView(this, catData, isDonut = false) { cat -> })
 
-        // 3. Warehouse Circle (Measure: Space/Item distribution)
         val whGroups = allAdminProducts.groupBy { it.warehouseName ?: getString(R.string.main_warehouse) }
         val whColors = listOf("#FF4081", "#E040FB", "#7C4DFF", "#536DFE", "#448AFF")
         val whData = whGroups.entries.mapIndexed { index, entry ->
             ChartSlice(entry.key, entry.value.size.toFloat(), Color.parseColor(whColors[index % whColors.size]), entry.key)
         }
-        chartCircleWarehouse.addView(PremiumChartView(this, whData, isDonut = false) { wh ->
-            // Filter list by warehouse
-        })
+        chartCircleWarehouse.addView(PremiumChartView(this, whData, isDonut = false) { wh -> })
     }
 
     data class ChartSlice(val label: String, val value: Float, val color: Int, val tag: String)
@@ -487,27 +490,20 @@ class AdminActivity : BaseActivity() {
             val size = Math.min(width, height).toFloat()
             val pad = size * 0.1f
             rect.set(pad, pad, size - pad, size - pad)
-
             if (total == 0f) return
-
             var startAngle = -90f
             data.forEach { slice ->
                 val sweep = (slice.value / total) * 360f
                 paint.color = slice.color
                 paint.style = Paint.Style.FILL
-                
-                // Add a subtle shadow/glow effect
                 paint.setShadowLayer(10f, 0f, 0f, slice.color and 0x80FFFFFF.toInt())
                 canvas.drawArc(rect, startAngle, sweep, true, paint)
                 paint.clearShadowLayer()
-                
                 startAngle += sweep
             }
-
             if (isDonut) {
-                paint.color = Color.parseColor("#F5F5F5") // Center color
+                paint.color = Color.parseColor("#F5F5F5")
                 canvas.drawCircle(size / 2, size / 2, size * 0.25f, paint)
-                
                 paint.color = Color.DKGRAY
                 paint.textAlign = Paint.Align.CENTER
                 paint.textSize = size * 0.12f
@@ -515,7 +511,6 @@ class AdminActivity : BaseActivity() {
                 canvas.drawText(total.toInt().toString(), size / 2, size / 2 + (paint.textSize / 3), paint)
             }
         }
-        
         override fun onTouchEvent(event: android.view.MotionEvent): Boolean {
             if (event.action == android.view.MotionEvent.ACTION_UP) {
                 performClick()
@@ -524,7 +519,6 @@ class AdminActivity : BaseActivity() {
             }
             return true
         }
-
         override fun performClick(): Boolean {
             super.performClick()
             return true

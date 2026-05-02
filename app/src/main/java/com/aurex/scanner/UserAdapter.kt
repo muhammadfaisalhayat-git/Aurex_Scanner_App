@@ -11,7 +11,8 @@ import com.aurex.scanner.data.User
 class UserAdapter(
     private val users: List<User>,
     private val onEdit: (User) -> Unit,
-    private val onDelete: (User) -> Unit
+    private val onDelete: (User) -> Unit,
+    private val onApprove: (User) -> Unit
 ) : RecyclerView.Adapter<UserAdapter.UserViewHolder>() {
 
     class UserViewHolder(view: View) : RecyclerView.ViewHolder(view) {
@@ -20,6 +21,7 @@ class UserAdapter(
         val position: TextView = view.findViewById(R.id.txtUserPosition)
         val status: TextView = view.findViewById(R.id.txtUserStatus)
         val dailyScans: TextView = view.findViewById(R.id.txtDailyScans)
+        val btnApprove: ImageButton = view.findViewById(R.id.btnApproveUser)
         val btnEdit: ImageButton = view.findViewById(R.id.btnEditUser)
         val btnDelete: ImageButton = view.findViewById(R.id.btnDeleteUser)
     }
@@ -39,12 +41,15 @@ class UserAdapter(
             holder.status.visibility = View.VISIBLE
             holder.status.setText(R.string.status_admin)
             holder.status.setBackgroundResource(android.R.color.holo_red_dark)
+            holder.btnApprove.visibility = View.GONE
         } else if (!user.isApproved) {
             holder.status.visibility = View.VISIBLE
             holder.status.setText(R.string.status_pending)
             holder.status.setBackgroundResource(android.R.color.holo_orange_dark)
+            holder.btnApprove.visibility = View.VISIBLE
         } else {
             holder.status.visibility = View.GONE
+            holder.btnApprove.visibility = View.GONE
         }
 
         if (user.dailyScans > 0) {
@@ -54,6 +59,7 @@ class UserAdapter(
             holder.dailyScans.visibility = View.GONE
         }
 
+        holder.btnApprove.setOnClickListener { onApprove(user) }
         holder.btnEdit.setOnClickListener { onEdit(user) }
         holder.btnDelete.setOnClickListener { onDelete(user) }
     }
