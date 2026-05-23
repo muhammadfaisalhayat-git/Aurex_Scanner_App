@@ -219,21 +219,35 @@
                     android:layout_height="wrap_content" />
             </com.google.android.material.textfield.TextInputLayout>
 
-            <TextView
-                android:id="@+id/txtMfgDisplay"
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/tilMfg"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:text="MFG: Not found" />
+                android:layout_marginTop="12dp"
+                app:endIconMode="custom"
+                app:endIconDrawable="@drawable/ic_scan"
+                app:endIconTint="#5E7D6A"
+                android:hint="@string/mfg_date">
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/editMfg"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+            </com.google.android.material.textfield.TextInputLayout>
 
-            <TextView
-                android:id="@+id/txtExpDisplay"
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/tilExp"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
-                android:textColor="#D32F2F"
-                android:textStyle="bold"
-                android:text="EXP: Not found" />
+                app:endIconMode="custom"
+                app:endIconDrawable="@drawable/ic_scan"
+                app:endIconTint="#5E7D6A"
+                android:hint="@string/exp_date">
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/editExp"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+            </com.google.android.material.textfield.TextInputLayout>
 
             <com.google.android.material.textfield.TextInputLayout
                 style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu"

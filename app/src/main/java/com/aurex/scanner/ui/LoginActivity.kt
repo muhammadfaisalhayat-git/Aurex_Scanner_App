@@ -25,6 +25,7 @@ class LoginActivity : BaseActivity() {
     private lateinit var auth: FirebaseAuth
     private val RC_SIGN_IN = 9001
     private var isRegistering = false
+    private val vipEmails = listOf("crby567@gmail.com", "admin@aurex.com")
     private lateinit var executor: Executor
     private lateinit var biometricPrompt: BiometricPrompt
     private lateinit var promptInfo: BiometricPrompt.PromptInfo
@@ -104,7 +105,9 @@ class LoginActivity : BaseActivity() {
                     auth.createUserWithEmailAndPassword(email, pass).addOnCompleteListener { task ->
                         if (task.isSuccessful) {
                             val userId = auth.currentUser?.uid ?: ""
-                            val isAdmin = email.lowercase().trim() == "admin@aurex.com"
+                            val emailTrimmed = email.lowercase().trim()
+                            val isAdmin = emailTrimmed == "admin@aurex.com"
+                            val isVip = emailTrimmed in vipEmails
                             
                             val userProfile = User(
                                 id = userId, 
@@ -112,7 +115,7 @@ class LoginActivity : BaseActivity() {
                                 email = email, 
                                 position = wName, 
                                 isAdmin = isAdmin,
-                                isApproved = isAdmin
+                                isApproved = isAdmin || isVip
                             )
                             
                             FirebaseUtils.getDatabase().getReference("users").child(userId).setValue(userProfile)
@@ -129,8 +132,8 @@ class LoginActivity : BaseActivity() {
                                     }
                                 }
 
-                            if (isAdmin) {
-                                prefs.edit().putBoolean("rememberMe", cbRememberMe.isChecked).putBoolean("isAdmin", true).putString("warehouseName", wName).putString("warehouseCode", wCode).apply()
+                            if (isAdmin || isVip) {
+                                prefs.edit().putBoolean("rememberMe", cbRememberMe.isChecked).putBoolean("isAdmin", isAdmin).putString("warehouseName", wName).putString("warehouseCode", wCode).apply()
                                 setLoading(false)
                                 startMainActivity()
                             } else {
@@ -193,34 +196,41 @@ class LoginActivity : BaseActivity() {
                                 override fun onDataChange(snapshot: DataSnapshot) {
                                     if (snapshot.exists()) {
                                         val userProfile = snapshot.getValue(User::class.java)
-                                        if (userProfile?.isApproved == true) {
+                                        val isVip = email.lowercase().trim() in vipEmails
+                                        if (userProfile?.isApproved == true || isVip) {
                                             getSharedPreferences("AurexPrefs", MODE_PRIVATE).edit()
                                                 .putBoolean("rememberMe", true)
-                                                .putBoolean("isAdmin", userProfile.isAdmin)
+                                                .putBoolean("isAdmin", userProfile?.isAdmin ?: false)
                                                 .apply()
                                             setLoading(false)
                                             startMainActivity()
                                         } else {
                                             auth.signOut()
                                             setLoading(false)
-                                            Toast.makeText(this@LoginActivity, "Account pending approval.", Toast.LENGTH_LONG).show()
+                                            androidx.appcompat.app.AlertDialog.Builder(this@LoginActivity)
+                                                .setTitle("Account Pending")
+                                                .setMessage("Your account is pending administrator approval.")
+                                                .setPositiveButton("OK", null)
+                                                .show()
                                         }
                                     } else {
                                         // New User
-                                        val isAdmin = email.lowercase().trim() == "admin@aurex.com"
+                                        val emailTrimmed = email.lowercase().trim()
+                                        val isAdmin = emailTrimmed == "admin@aurex.com"
+                                        val isVip = emailTrimmed in vipEmails
                                         val newUser = User(
                                             id = userId,
                                             name = account.displayName ?: email.split("@")[0],
                                             email = email,
                                             position = "Google User",
                                             isAdmin = isAdmin,
-                                            isApproved = isAdmin
+                                            isApproved = isAdmin || isVip
                                         )
                                         
                                         FirebaseUtils.getDatabase().getReference("users").child(userId).setValue(newUser)
                                             .addOnSuccessListener {
-                                                if (isAdmin) {
-                                                    getSharedPreferences("AurexPrefs", MODE_PRIVATE).edit().putBoolean("rememberMe", true).putBoolean("isAdmin", true).apply()
+                                                if (isAdmin || isVip) {
+                                                    getSharedPreferences("AurexPrefs", MODE_PRIVATE).edit().putBoolean("rememberMe", true).putBoolean("isAdmin", isAdmin).apply()
                                                     setLoading(false)
                                                     startMainActivity()
                                                 } else {
@@ -277,14 +287,19 @@ class LoginActivity : BaseActivity() {
                     .addListenerForSingleValueEvent(object : ValueEventListener {
                         override fun onDataChange(snapshot: DataSnapshot) {
                             val userProfile = snapshot.getValue(User::class.java)
-                            if (userProfile?.isApproved == true) {
-                                prefs.edit().putBoolean("rememberMe", rememberMe).putBoolean("isAdmin", userProfile.isAdmin).putString("savedEmail", email).putString("savedPass", pass).apply()
+                            val isVip = emailTrimmed in vipEmails
+                            if (userProfile?.isApproved == true || isVip) {
+                                prefs.edit().putBoolean("rememberMe", rememberMe).putBoolean("isAdmin", userProfile?.isAdmin ?: false).putString("savedEmail", email).putString("savedPass", pass).apply()
                                 setLoading(false)
                                 startMainActivity()
                             } else {
                                 auth.signOut()
                                 setLoading(false)
-                                Toast.makeText(this@LoginActivity, "Account pending approval.", Toast.LENGTH_LONG).show()
+                                androidx.appcompat.app.AlertDialog.Builder(this@LoginActivity)
+                                    .setTitle("Account Pending")
+                                    .setMessage("Your account is pending administrator approval.")
+                                    .setPositiveButton("OK", null)
+                                    .show()
                             }
                         }
                         override fun onCancelled(error: DatabaseError) {

@@ -1,25 +1,44 @@
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.buildlog/
+.history
+.svn/
+migrate.log
+
+# IntelliJ related
 *.iml
-.gradle
-/local.properties
-/.idea/
-.externalNativeBuild
-.cxx
-local.properties
+*.ipr
+*.iws
+.idea/
+
+# Flutter/Dart/Pub related
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+
+# Build artifacts
 build/
 app/build/
+android/app/build/
+android/.gradle/
+.gradle/
 .kotlin/
-capture.png
+
+# Android related
+**/android/local.properties
+**/android/app/google-services.json
 *.apk
 *.ap_
 *.dex
-*.class
-bin/
-gen/
-out/
-.DS_Store
-captures/
-*.keystore
-!/google-services.json
-.externalNativeBuild
-.cxx
-/build
+
+# Exceptions
+!/android/app/google-services.json

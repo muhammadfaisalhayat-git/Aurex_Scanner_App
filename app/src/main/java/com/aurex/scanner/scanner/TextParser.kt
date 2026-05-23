@@ -8,13 +8,13 @@ import kotlin.math.abs
 object TextParser {
 
     private val mfgKeywords = listOf(
-        "production", "mfg", "mfd", "manufacture", "prod", "p:", "p :", "p.", "mfd date", "mfg date", "test date", "date of product", "date of production",
-        "انتاج", "تاريخ الانتاج", "تاريخ الإنتاج", "تاريخ الصنع", "تاريخ التصنيع", "صنع", "ت.ا", "DOM", "MFD", "تعبئة", "تعبئة في", "فحص", "تاريخ الفحص", "ت الفحص", "ت. فحص", "ت.فحص"
+        "production", "mfg", "mfd", "manufacture", "prod", "p:", "p :", "p.", "mfd date", "mfg date", "test date", "date of product", "date of production", "production date", "packed", "packing date", "pkd",
+        "انتاج", "تاريخ الانتاج", "تاريخ الإنتاج", "تاريخ الصنع", "تاريخ التصنيع", "صنع", "ت.ا", "DOM", "MFD", "تعبئة", "تعبئة في", "فحص", "تاريخ الفحص", "ت الفحص", "ت. فحص", "ت.فحص", "ت.الفحص"
     )
 
     private val expKeywords = listOf(
-        "expiry", "exp", "ex:", "ex.", "expire", "best before", "e:", "e :", "e.", "exp.", "expiry date", "use by", "date of expiry", "date of expiration",
-        "انتهاء", "تاريخ الانتهاء", "تاريخ الإنتهاء", "تاريخ النتهاء", "ت.هـ", "DOE", "EXP", "يستخدم قبل", "ينتهي في", "تاريخ انتهاء", "صالح حتى"
+        "expiry", "exp", "ex:", "ex.", "expire", "best before", "e:", "e :", "e.", "exp.", "expiry date", "use by", "date of expiry", "date of expiration", "expiration date", "valid until", "valid till", "exp. date", "exp date",
+        "انتهاء", "تاريخ الانتهاء", "تاريخ الإنتهاء", "تاريخ النتهاء", "ت.هـ", "DOE", "EXP", "يستخدم قبل", "ينتهي في", "تاريخ انتهاء", "صالح حتى", "تاريخ الصلاحية", "صلاحية", "ت.انتهاء"
     )
 
     private val nameKeywords = listOf(
@@ -23,12 +23,12 @@ object TextParser {
     )
 
     private val sizeKeywords = listOf(
-        "size", "weight", "qty", "quantity", "capacity", "net", "mass", "vol", "w:", "w :", "g.", "net wt", "net weight",
-        "الحجم", "الوزن", "الكمية", "السعة", "صافي", "الوزن الصافي", "الوزن القائم", "وزن", "الوزن عند التعبئة", "الوزن الصافي عند التعبئة", "الكمية الصافية", "الوزن :", "üjll"
+        "size", "weight", "qty", "quantity", "capacity", "net", "mass", "vol", "w:", "w :", "g.", "net wt", "net weight", "seeds",
+        "الحجم", "الوزن", "الكمية", "السعة", "صافي", "الوزن الصافي", "الوزن القائم", "وزن", "الوزن عند التعبئة", "الوزن الصافي عند التعبئة", "الكمية الصافية", "الوزن :", "بذور", "بذرة", "حبة", "üjll"
     )
 
     private val lotKeywords = listOf(
-        "lot", "batch", "b/n", "b/n:", "bn:", "b.n:", "رقم اللوط", "رقم التشغيلة", "رقم", "batch no", "lot no", "لوط", "رقم اللوط :", "رقم اللوط:"
+        "lot", "batch", "b/n", "b/n:", "bn:", "b.n:", "رقم اللوط", "رقم التشغيلة", "رقم", "batch no", "lot no", "لوط", "رقم اللوط :", "رقم اللوط:", "lot number", "انتاج رقم"
     )
 
     private val validityKeywords = listOf(
@@ -54,12 +54,14 @@ object TextParser {
         Regex("""\b(يناير|فبراير|مارس|أبريل|مايو|يونيو|يوليو|أغسطس|سبتمبر|أكتوبر|نوفمبر|ديسمبر)[.\s/-]+\d{4}\b"""),
         Regex("""\b\d{1,2}[.\s/-]+(يناير|فبراير|مارس|أبريل|مايو|يونيو|يوليو|أغسطس|سبتمبر|أكتوبر|نوفمبر|ديسمبر)[.\s/-]+\d{4}\b"""),
         
-        // No-separator formats (Stricter validation required for these)
-        Regex("""\b\d{8}\b"""), // YYYYMMDD
-        Regex("""\b\d{6}\b""")  // MMYYYY or DDMMYY
+        // No-separator formats (Stricter validation required)
+        Regex("""\b\d{8}\b""") // YYYYMMDD
     )
 
-    private val unitRegex = Regex("""(\d+[,.]?\d*)\s*(kg|g|mg|gr|ks|l|ml|liter|litres|gram|kilogram|kgm|غم|غرام|مل|ملي|ك|كيلو|كيلوجرام|كيلو جرام|جرام|جم|كجم)""", RegexOption.IGNORE_CASE)
+    private val unitRegex = Regex("""(\d+[,.]?\d*)\s*(kg|g|mg|gr|ks|l|ml|liter|litres|gram|kilogram|kgm|غم|غرام|مل|ملي|ك|كيلو|كيلوجرام|كيلو جرام|جرام|جم|كجم|seeds|بذرة|بذور|pcs|piece)""", RegexOption.IGNORE_CASE)
+
+    private val massUnits = listOf("kg", "g", "mg", "gr", "ks", "l", "ml", "liter", "litres", "gram", "kilogram", "kgm", "غم", "غرام", "مل", "ملي", "ك", "كيلو", "كيلوجرام", "كيلو جرام", "جرام", "جم", "كجم")
+    private val countUnits = listOf("seeds", "بذرة", "بذور", "حبة", "pcs", "piece")
 
     fun cleanProductCode(code: String): String {
         var c = code.trim()
@@ -111,29 +113,34 @@ object TextParser {
         
         val normalizedRaw = normalizeDigits(rawText)
         
-        // 1. First Pass: Look for specific patterns like "الوزن : 100 جرام" or "Weight: 100g"
+        // 1. First Pass: Look for specific patterns
         for (key in sizeKeywords) {
-            val keyIdx = normalizedRaw.indexOf(key)
+            val keyIdx = normalizedRaw.indexOf(key, ignoreCase = true)
             if (keyIdx != -1) {
                 val searchArea = normalizedRaw.substring(keyIdx + key.length).take(30).trim(':').trim()
-                unitRegex.find(searchArea)?.let {
-                    foundSize = it.value
+                unitRegex.find(searchArea)?.let { match ->
+                    val value = match.value
+                    val unit = match.groupValues[2].lowercase()
+                    if (massUnits.any { unit == it }) {
+                        foundSize = value
+                    } else if (countUnits.any { unit == it }) {
+                        foundQuantity = match.groupValues[1]
+                    }
                 }
-                if (foundSize != null) break
             }
         }
 
-        // 2. Second Pass: If not found, look for any standalone unit pattern in the text
-        if (foundSize == null) {
-            val sizeMatch = unitRegex.find(normalizedRaw)
-            if (sizeMatch != null) {
-                foundSize = sizeMatch.value
+        // 2. Second Pass: Generic search
+        if (foundSize == null || foundQuantity == "1") {
+            unitRegex.findAll(normalizedRaw).forEach { match ->
+                val value = match.value
+                val unit = match.groupValues[2].lowercase()
+                if (foundSize == null && massUnits.any { unit == it }) {
+                    foundSize = value
+                } else if (foundQuantity == "1" && countUnits.any { unit == it }) {
+                    foundQuantity = match.groupValues[1]
+                }
             }
-        }
-        
-        // 3. Extract quantity digit if found standalone
-        if (foundSize != null) {
-            foundQuantity = Regex("""\d+""").find(foundSize)?.value ?: "1"
         }
         
         // Look for Product Code/Batch
@@ -217,17 +224,17 @@ object TextParser {
             pattern.findAll(normalized).forEach { match ->
                 var raw = match.value.trim()
                 if (!raw.any { it.isLetter() }) {
+                    // Check if it's potentially a lot number disguised as a date (e.g., 101944)
+                    // If it's 6 digits, we now only allow it if it has separators (Handled by removing \b\d{6}\b)
+                    
                     raw = raw.replace(" ", "")
-                    // Heuristic for no-separator dates
+                    // Heuristic for no-separator dates (8-digit only)
                     if (raw.length == 8 && !raw.contains("/") && !raw.contains(".") && !raw.contains("-")) {
-                        // Check if it looks like a date (e.g., month isn't 35)
                         val m1 = try { raw.substring(0, 2).toInt() } catch (e: Exception) { 0 }
                         val m2 = try { raw.substring(2, 4).toInt() } catch (e: Exception) { 0 }
                         if (m1 in 1..12 || m2 in 1..12) {
                             raw = "${raw.substring(0, 2)}/${raw.substring(2, 4)}/${raw.substring(4)}"
                         } else return@forEach
-                    } else if (raw.length == 6 && !raw.contains("/") && !raw.contains(".") && !raw.contains("-")) {
-                        raw = "${raw.substring(0, 2)}/${raw.substring(2, 4)}/${raw.substring(4)}"
                     }
                     val dateVal = raw.replace(".", "/").replace("-", "/")
                     if (isValidDate(dateVal)) found.add(dateVal)
@@ -239,7 +246,7 @@ object TextParser {
 
     private fun extractSmartNameFromRaw(rawText: String): String {
         val lines = rawText.lines().filter { it.isNotBlank() }
-        val noise = Regex("""(?i)batch|lot|weight|net|tel|phone|price|egp|le|pcs|size|qty|p:|e:|b/n|\d|انتاج|فحص|تاريخ|exp|mfg|prod|date|expiry|الصافي|وزن""")
+        val noise = Regex("""(?i)batch|lot|weight|net|tel|phone|price|egp|le|pcs|size|qty|p:|e:|b/n|\d|انتاج|فحص|تاريخ|exp|mfg|prod|date|expiry|الصافي|وزن|seeds|بذور|بذرة""")
         for (line in lines.take(5)) {
             val trimmed = line.trim().substringBefore("Prod").substringBefore("EXP").trim()
             if (trimmed.length > 4 && !noise.containsMatchIn(trimmed)) return trimmed
@@ -256,31 +263,38 @@ object TextParser {
         
         val fullText = normalizeDigits(mlText.text)
         
-        // 1. Prioritize text following "Weight" or "الوزن" keywords in blocks
+        // 1. Prioritize text following keywords
         for (block in mlText.textBlocks) {
             val blockText = normalizeDigits(block.text)
             for (key in sizeKeywords) {
-                if (blockText.contains(key)) {
+                if (blockText.contains(key, ignoreCase = true)) {
                     val afterKey = blockText.substringAfter(key).trim(':').trim()
-                    unitRegex.find(afterKey)?.let {
-                        foundSize = it.value
+                    unitRegex.find(afterKey)?.let { match ->
+                        val value = match.value
+                        val unit = match.groupValues[2].lowercase()
+                        
+                        if (massUnits.any { unit == it }) {
+                            foundSize = value
+                        } else if (countUnits.any { unit == it }) {
+                            foundQuantity = match.groupValues[1]
+                        }
                     }
-                    if (foundSize != null) break
                 }
             }
-            if (foundSize != null) break
         }
 
-        // 2. Fallback to generic pattern search
-        if (foundSize == null) {
-            val sizeMatch = unitRegex.find(fullText)
-            if (sizeMatch != null) {
-                foundSize = sizeMatch.value
+        // 2. Fallback to generic pattern search for anything missing
+        if (foundSize == null || foundQuantity == "1") {
+            unitRegex.findAll(fullText).forEach { match ->
+                val value = match.value
+                val unit = match.groupValues[2].lowercase()
+                
+                if (foundSize == null && massUnits.any { unit == it }) {
+                    foundSize = value
+                } else if (foundQuantity == "1" && countUnits.any { unit == it }) {
+                    foundQuantity = match.groupValues[1]
+                }
             }
-        }
-
-        if (foundSize != null) {
-            foundQuantity = Regex("""\d+""").find(foundSize!!)?.value ?: "1"
         }
 
         for (block in mlText.textBlocks) {
@@ -313,21 +327,26 @@ object TextParser {
             }
         }
 
+        val uniqueDateElements = dateElements.distinctBy { convertToSortable(it.value) }
         var finalMfg: String? = null
         var finalExp: String? = null
         var mfgBox: String? = null
         var expBox: String? = null
 
-        for (dateElem in dateElements) {
+        for (dateElem in uniqueDateElements) {
             val dateBox = dateElem.line.boundingBox ?: continue
             var bestType = 0 
-            var minDist = 600f // Increased distance for complex labels
+            var minDist = 1000f // Increased distance for complex labels
             
             for (block in mlText.textBlocks) {
                 val bBox = block.boundingBox ?: continue
                 val bText = block.text.lowercase()
-                // Reduced weight for horizontal distance as labels are often far left/right
-                val dist = abs(bBox.centerY() - dateBox.centerY()).toFloat() + abs(bBox.left - dateBox.left).toFloat() * 0.3f
+                
+                // Table-friendly distance: Heavily prioritize vertical proximity (same row)
+                // Columns are usually further apart horizontally than rows are vertically.
+                val yDist = abs(bBox.centerY() - dateBox.centerY()).toFloat()
+                val xDist = abs(bBox.left - dateBox.left).toFloat()
+                val dist = yDist * 2.5f + xDist * 0.1f // Favor vertical alignment heavily
                 
                 if (dist < minDist) {
                     if (mfgKeywords.any { bText.contains(it) }) { bestType = 1; minDist = dist }
@@ -344,25 +363,25 @@ object TextParser {
             }
         }
 
-        val allUniqueDates = dateElements.map { it.value }.distinct()
-        if (allUniqueDates.size >= 2) {
-            val sorted = sortDateStrings(allUniqueDates)
+        val allUniqueDatesStrings = uniqueDateElements.map { it.value }.distinct()
+        if (allUniqueDatesStrings.size >= 2) {
+            val sorted = sortDateStrings(allUniqueDatesStrings)
             if (finalMfg == null && finalExp == null) {
                 finalMfg = sorted.first(); finalExp = sorted.last()
             } else if (finalMfg != null && finalExp == null) {
-                finalExp = allUniqueDates.find { it != finalMfg }
+                finalExp = allUniqueDatesStrings.find { it != finalMfg }
             } else if (finalExp != null && finalMfg == null) {
-                finalMfg = allUniqueDates.find { it != finalExp }
+                finalMfg = allUniqueDatesStrings.find { it != finalExp }
             }
             if (finalMfg != null && finalExp != null && isSecondBeforeFirst(finalExp, finalMfg)) {
                 val t = finalMfg; finalMfg = finalExp; finalExp = t
             }
-        } else if (allUniqueDates.size == 1) {
+        } else if (allUniqueDatesStrings.size == 1) {
             if (finalMfg != null || foundValidityText.isNotEmpty()) {
-                finalMfg = allUniqueDates.first()
+                finalMfg = allUniqueDatesStrings.first()
                 finalExp = calculateExpiry(finalMfg, foundValidityText)
             } else {
-                finalExp = allUniqueDates.first()
+                finalExp = allUniqueDatesStrings.first()
             }
         }
 
@@ -435,14 +454,14 @@ object TextParser {
     private fun extractSmartName(mlText: Text, lot: String): String {
         val candidates = mutableListOf<NameCandidate>()
         // Improved noise filter to exclude registration numbers and common non-name terms
-        val noise = Regex("""(?i)batch|lot|weight|net|tel|phone|price|egp|le|pcs|size|qty|p:|e:|b/n|انتاج|فحص|تاريخ|exp|mfg|prod|date|expiry|الصافي|وزن|تسجيل|رقم|s000|\b\d{4,}\b|الوزن|جرام|gram|üjll""")
+        val noise = Regex("""(?i)batch|lot|weight|net|tel|phone|price|egp|le|pcs|size|qty|p:|e:|b/n|انتاج|فحص|تاريخ|exp|mfg|prod|date|expiry|الصافي|وزن|تسجيل|رقم|s000|\b\d{4,}\b|الوزن|جرام|gram|üjll|بذور|seeds|بذرة|بذره""")
         
         for (block in mlText.textBlocks) {
             val originalText = block.text.trim().replace("\n", " ")
             val bBox = block.boundingBox ?: continue
             
-            // If the text starts with a weight keyword, it's probably not the name
-            if (sizeKeywords.any { originalText.lowercase().startsWith(it) }) continue
+            // If the text contains a size keyword, it's likely not the name
+            if (sizeKeywords.any { originalText.contains(it, ignoreCase = true) }) continue
             
             // Priority 1: Text following an Arabic or English name keyword
             for (key in nameKeywords) {

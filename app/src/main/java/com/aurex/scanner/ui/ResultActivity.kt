@@ -24,7 +24,9 @@ import com.google.firebase.database.DatabaseError
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import androidx.camera.core.ExperimentalGetImage
 
+@ExperimentalGetImage
 class ResultActivity : BaseActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -56,8 +58,8 @@ class ResultActivity : BaseActivity() {
         val editSize = findViewById<EditText>(R.id.editSize)
         val editCategory = findViewById<AutoCompleteTextView>(R.id.editCategory)
         val editWarehouse = findViewById<EditText>(R.id.editWarehouse)
-        val txtMfg = findViewById<TextView>(R.id.txtMfgDisplay)
-        val txtExp = findViewById<TextView>(R.id.txtExpDisplay)
+        val editMfg = findViewById<EditText>(R.id.editMfg)
+        val editExp = findViewById<EditText>(R.id.editExp)
         val btnSave = findViewById<Button>(R.id.btnSave)
         val btnRescan = findViewById<Button>(R.id.btnRescan)
         val tilProductCode = findViewById<com.google.android.material.textfield.TextInputLayout>(R.id.tilProductCode)
@@ -84,8 +86,8 @@ class ResultActivity : BaseActivity() {
             editSize.setText(p.size ?: "")
             editCategory.setText(p.category ?: general)
             editWarehouse.setText(p.warehouseName ?: getSharedPreferences("AurexPrefs", MODE_PRIVATE).getString("lastWarehouse", ""))
-            txtMfg.text = getString(R.string.mfg_label, p.mfgDate ?: notFound)
-            txtExp.text = getString(R.string.exp_label, p.expDate ?: notFound)
+            editMfg.setText(p.mfgDate ?: "")
+            editExp.setText(p.expDate ?: "")
         }
 
         updateUI(product)
@@ -135,6 +137,20 @@ class ResultActivity : BaseActivity() {
             startActivityForResult(intent, 1002)
         }
 
+        findViewById<com.google.android.material.textfield.TextInputLayout>(R.id.tilMfg).setEndIconOnClickListener {
+            val intent = Intent(this, ScannerActivity::class.java)
+            intent.putExtra("SINGLE_SCAN_MODE", true)
+            intent.putExtra("SCAN_TARGET", "MFG")
+            startActivityForResult(intent, 1003)
+        }
+
+        findViewById<com.google.android.material.textfield.TextInputLayout>(R.id.tilExp).setEndIconOnClickListener {
+            val intent = Intent(this, ScannerActivity::class.java)
+            intent.putExtra("SINGLE_SCAN_MODE", true)
+            intent.putExtra("SCAN_TARGET", "EXP")
+            startActivityForResult(intent, 1004)
+        }
+
         setupCategoryDropdown(editCategory)
 
         product.imagePath?.let { path ->
@@ -163,6 +179,8 @@ class ResultActivity : BaseActivity() {
             val sizeString = editSize.text.toString().trim()
             val categoryString = editCategory.text.toString().trim()
             val warehouseString = editWarehouse.text.toString().trim()
+            val mfgString = editMfg.text.toString().trim()
+            val expString = editExp.text.toString().trim()
             
             if (updatedCode.isEmpty()) {
                 Toast.makeText(this, "Please enter a product code", Toast.LENGTH_SHORT).show()
@@ -181,6 +199,8 @@ class ResultActivity : BaseActivity() {
             val finalProduct = product.copy(
                 productCode = updatedCode,
                 name = updatedName,
+                mfgDate = if (mfgString.isEmpty()) null else mfgString,
+                expDate = if (expString.isEmpty()) null else expString,
                 quantity = qtyString,
                 size = sizeString,
                 category = if (categoryString.isEmpty()) "General" else categoryString,
@@ -222,6 +242,14 @@ class ResultActivity : BaseActivity() {
                     1002 -> {
                         findViewById<EditText>(R.id.editName).setText(scannedResult)
                         Toast.makeText(this, "Product Name Scanned: $scannedResult", Toast.LENGTH_SHORT).show()
+                    }
+                    1003 -> {
+                        findViewById<EditText>(R.id.editMfg).setText(scannedResult)
+                        Toast.makeText(this, "MFG Date Scanned: $scannedResult", Toast.LENGTH_SHORT).show()
+                    }
+                    1004 -> {
+                        findViewById<EditText>(R.id.editExp).setText(scannedResult)
+                        Toast.makeText(this, "EXP Date Scanned: $scannedResult", Toast.LENGTH_SHORT).show()
                     }
                 }
             }

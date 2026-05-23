@@ -6,18 +6,22 @@ import java.io.Serializable
 
 @Entity
 data class Product(
-    @PrimaryKey var productCode: String = "",
-    var id: Long = 0, // Keep id for internal ordering if needed, but not as PK
+    @PrimaryKey(autoGenerate = true) var id: Long = 0,
+    var productCode: String = "",
     var name: String = "",
     var mfgDate: String? = null,
     var expDate: String? = null,
     var quantity: String = "1",
-    var size: String? = null, // e.g., "500ml", "1kg"
+    var size: String? = null,
     var category: String? = "General",
     var imagePath: String? = null,
     var warehouseName: String? = null,
     var barcode: String? = null,
-    var mfgBox: String? = null, // Store as "left,top,right,bottom"
-    var expBox: String? = null,  // Store as "left,top,right,bottom"
-    var isSynced: Boolean = false
+    var mfgBox: String? = null,
+    var expBox: String? = null,
+    var isSynced: Boolean = false,
+    
+    // Multi-tenant fields
+    var groupId: String? = "lafi_al_harbi_group", // Default Tenant
+    var companyId: String? = "bin_awf"           // Default Company
 ) : Serializable

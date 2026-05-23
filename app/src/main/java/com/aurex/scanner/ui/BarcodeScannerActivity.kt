@@ -23,6 +23,7 @@ class BarcodeScannerActivity : BaseActivity() {
     private lateinit var previewView: PreviewView
     private lateinit var cameraExecutor: ExecutorService
     private val toneGenerator = ToneGenerator(AudioManager.STREAM_NOTIFICATION, 100)
+    private var isDetected = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -53,15 +54,23 @@ class BarcodeScannerActivity : BaseActivity() {
             val barcodeScanner = BarcodeScanning.getClient()
 
             imageAnalysis.setAnalyzer(cameraExecutor) { imageProxy ->
+                if (isDetected) {
+                    imageProxy.close()
+                    return@setAnalyzer
+                }
+
                 val mediaImage = imageProxy.image
                 if (mediaImage != null) {
                     val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
 
                     barcodeScanner.process(image)
                         .addOnSuccessListener { barcodes ->
+                            if (isDetected) return@addOnSuccessListener
+                            
                             for (barcode in barcodes) {
                                 val code = barcode.rawValue
                                 if (code != null) {
+                                    isDetected = true
                                     toneGenerator.startTone(ToneGenerator.TONE_PROP_BEEP, 150)
                                     val cleanedCode = com.aurex.scanner.scanner.TextParser.cleanProductCode(code)
                                     val resultIntent = Intent()

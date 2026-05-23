@@ -361,30 +361,4 @@ class MainActivity : BaseActivity() {
             else -> super.onOptionsItemSelected(item)
         }
     }
-
-    private fun showNotificationsDialog() {
-        val prefs = getSharedPreferences("AurexPrefs", MODE_PRIVATE)
-        val isAdmin = prefs.getBoolean("isAdmin", false)
-        val currentUser = FirebaseAuth.getInstance().currentUser
-        val userId = if (isAdmin) "admin" else currentUser?.uid ?: return
-        val dialogView = layoutInflater.inflate(R.layout.dialog_notifications, null)
-        val rvNotifs = dialogView.findViewById<RecyclerView>(R.id.rvNotifications)
-        rvNotifs.layoutManager = LinearLayoutManager(this)
-        val notifList = mutableListOf<Notification>()
-        val adapter = NotificationAdapter(notifList) { notif ->
-            NotificationHelper.markAsRead(userId, notif.id)
-            if (notif.type == "approval" && isAdmin) startActivity(Intent(this, AdminActivity::class.java))
-        }
-        rvNotifs.adapter = adapter
-        val notifRef = FirebaseUtils.getDatabase().getReference("notifications").child(userId)
-        notifRef.orderByChild("timestamp").limitToLast(50).addValueEventListener(object : ValueEventListener {
-            override fun onDataChange(snapshot: DataSnapshot) {
-                notifList.clear()
-                for (child in snapshot.children) { child.getValue(Notification::class.java)?.let { it.id = child.key ?: ""; notifList.add(0, it) } }
-                adapter.notifyDataSetChanged()
-            }
-            override fun onCancelled(error: DatabaseError) {}
-        })
-        AlertDialog.Builder(this).setTitle(R.string.notifications).setView(dialogView).setPositiveButton(R.string.close, null).show()
-    }
 }

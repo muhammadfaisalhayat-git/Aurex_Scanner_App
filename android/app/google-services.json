@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "926048009789",
+    "project_id": "aurexscannerapp",
+    "storage_bucket": "aurexscannerapp.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:926048009789:android:6fd963b5fee8f12e40b454",
+        "android_client_info": {
+          "package_name": "com.aurex.scanner"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBQ7fqAPnoekD7zibmorerOXJsGSFZB_x0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

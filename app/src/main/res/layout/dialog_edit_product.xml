@@ -48,9 +48,13 @@
         </com.google.android.material.textfield.TextInputLayout>
 
         <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/tilMfg"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
+            app:endIconMode="custom"
+            app:endIconDrawable="@drawable/ic_scan"
+            app:endIconTint="#4CAF50"
             android:hint="@string/mfg_date">
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/editMfg"
@@ -59,9 +63,13 @@
         </com.google.android.material.textfield.TextInputLayout>
 
         <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/tilExp"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
+            app:endIconMode="custom"
+            app:endIconDrawable="@drawable/ic_scan"
+            app:endIconTint="#4CAF50"
             android:hint="@string/exp_date">
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/editExp"

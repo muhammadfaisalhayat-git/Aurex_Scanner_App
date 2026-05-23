@@ -21,6 +21,12 @@ import com.google.firebase.database.ValueEventListener
 
 import android.content.Intent
 import android.view.MenuItem
+import android.view.LayoutInflater
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
+import androidx.appcompat.app.AlertDialog
+import com.aurex.scanner.NotificationAdapter
+import com.aurex.scanner.R
 
 open class BaseActivity : AppCompatActivity() {
     private var adminNotifListener: ValueEventListener? = null
@@ -39,7 +45,7 @@ open class BaseActivity : AppCompatActivity() {
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         return when (item.itemId) {
-            com.aurex.scanner.R.id.action_home -> {
+            R.id.action_home -> {
                 if (this !is MainActivity) {
                     val intent = Intent(this, MainActivity::class.java)
                     intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
@@ -144,5 +150,49 @@ open class BaseActivity : AppCompatActivity() {
 
     override fun attachBaseContext(newBase: Context) {
         super.attachBaseContext(LocaleHelper.onAttach(newBase))
+    }
+
+    fun showNotificationsDialog() {
+        val prefs = getSharedPreferences("AurexPrefs", MODE_PRIVATE)
+        val isAdmin = prefs.getBoolean("isAdmin", false)
+        val currentUser = FirebaseAuth.getInstance().currentUser
+        val userId = if (isAdmin) "admin" else currentUser?.uid ?: return
+        
+        val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_notifications, null)
+        val rvNotifs = dialogView.findViewById<RecyclerView>(R.id.rvNotifications)
+        rvNotifs.layoutManager = LinearLayoutManager(this)
+        
+        val notifList = mutableListOf<Notification>()
+        val adapter = NotificationAdapter(notifList) { notif ->
+            NotificationHelper.markAsRead(userId, notif.id)
+            if (notif.type == "approval" && isAdmin) {
+                startActivity(Intent(this, AdminActivity::class.java))
+            }
+        }
+        rvNotifs.adapter = adapter
+
+        val notifRef = FirebaseUtils.getDatabase().getReference("notifications").child(userId)
+        notifRef.orderByChild("timestamp").limitToLast(50)
+            .addValueEventListener(object : ValueEventListener {
+                override fun onDataChange(snapshot: DataSnapshot) {
+                    notifList.clear()
+                    for (child in snapshot.children) {
+                        child.getValue(Notification::class.java)?.let { 
+                            it.id = child.key ?: ""
+                            notifList.add(0, it) 
+                        }
+                    }
+                    adapter.notifyDataSetChanged()
+                }
+                override fun onCancelled(error: DatabaseError) {
+                    Log.e("Notifications", "Database Error: ${error.message}")
+                }
+            })
+
+        AlertDialog.Builder(this)
+            .setTitle(R.string.notifications)
+            .setView(dialogView)
+            .setPositiveButton(R.string.close, null)
+            .show()
     }
 }

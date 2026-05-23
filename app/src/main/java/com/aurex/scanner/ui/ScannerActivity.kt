@@ -58,6 +58,7 @@ class ScannerActivity : BaseActivity() {
     private lateinit var scaleGestureDetector: ScaleGestureDetector
 
     private val shutterSound = MediaActionSound()
+    private var toneGenerator: android.media.ToneGenerator? = null
 
     // Use Latin Recognizer for live feedback
     private val textRecognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
@@ -65,6 +66,7 @@ class ScannerActivity : BaseActivity() {
     private var isFlashOn = false
     private var detectedBarcode: String? = null
     private var lastDetectionTime = 0L
+    private var isProcessing = false
 
     private var isSingleScanMode = false
     private var scanTarget: String? = null
@@ -108,6 +110,12 @@ class ScannerActivity : BaseActivity() {
 
         shutterSound.load(MediaActionSound.SHUTTER_CLICK)
         shutterSound.load(MediaActionSound.FOCUS_COMPLETE)
+        
+        try {
+            toneGenerator = android.media.ToneGenerator(android.media.AudioManager.STREAM_NOTIFICATION, 100)
+        } catch (e: Exception) {
+            Log.e("ScannerActivity", "Failed to init ToneGenerator", e)
+        }
 
         captureBtn.setOnClickListener {
             it.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
@@ -126,6 +134,8 @@ class ScannerActivity : BaseActivity() {
     }
 
     private fun resetScannerUI() {
+        if (isProcessing) return
+        
         runOnUiThread {
             processingLayout.visibility = android.view.View.GONE
             controlsLayout.visibility = android.view.View.VISIBLE
@@ -183,6 +193,11 @@ class ScannerActivity : BaseActivity() {
             val barcodeScanner = BarcodeScanning.getClient()
 
             imageAnalysis.setAnalyzer(cameraExecutor) { imageProxy ->
+                if (isProcessing) {
+                    imageProxy.close()
+                    return@setAnalyzer
+                }
+
                 val mediaImage = imageProxy.image
 
                 if (mediaImage != null) {
@@ -218,6 +233,8 @@ class ScannerActivity : BaseActivity() {
                     // ✅ Barcode
                     barcodeScanner.process(image)
                         .addOnSuccessListener { barcodes ->
+                            if (isProcessing) return@addOnSuccessListener
+                            
                             for (barcode in barcodes) {
                                 // Strip common technical prefixes like ]C1 or [C1 via TextParser
                                 val raw = barcode.rawValue ?: ""
@@ -225,8 +242,7 @@ class ScannerActivity : BaseActivity() {
                                     if (detectedBarcode == null) {
                                         // Play beep for first detection in live view
                                         try {
-                                            val toneG = android.media.ToneGenerator(android.media.AudioManager.STREAM_NOTIFICATION, 100)
-                                            toneG.startTone(android.media.ToneGenerator.TONE_PROP_BEEP, 100)
+                                            toneGenerator?.startTone(android.media.ToneGenerator.TONE_PROP_BEEP, 100)
                                         } catch (e: Exception) {}
                                     }
                                     detectedBarcode = TextParser.cleanProductCode(raw)
@@ -261,6 +277,7 @@ class ScannerActivity : BaseActivity() {
 
     private fun takePhoto() {
         if (!::imageCapture.isInitialized) return
+        if (isProcessing) return
 
         // Force target rotation to match current display
         try {
@@ -272,6 +289,7 @@ class ScannerActivity : BaseActivity() {
 
         shutterSound.play(MediaActionSound.SHUTTER_CLICK)
 
+        isProcessing = true
         processingLayout.visibility = android.view.View.VISIBLE
         controlsLayout.visibility = android.view.View.GONE
 
@@ -302,8 +320,11 @@ class ScannerActivity : BaseActivity() {
                 }
 
                 override fun onError(exc: ImageCaptureException) {
+                    isProcessing = false
                     resetScannerUI()
-                    Toast.makeText(this@ScannerActivity, "Capture failed", Toast.LENGTH_SHORT).show()
+                    runOnUiThread {
+                        Toast.makeText(this@ScannerActivity, "Capture failed", Toast.LENGTH_SHORT).show()
+                    }
                 }
             }
         )
@@ -328,7 +349,7 @@ class ScannerActivity : BaseActivity() {
     }
 
     private fun processImage(file: File) {
-        // Rotation is already fixed in onImageSaved
+        // Rotation is already fixed in onImageSaved or handleGalleryImage
 
         val permanentFile = File(
             getExternalFilesDir(Environment.DIRECTORY_PICTURES),
@@ -341,6 +362,7 @@ class ScannerActivity : BaseActivity() {
 
         // 3. Process the compressed/rotated image
         OCRProcessor.process(this, Uri.fromFile(permanentFile)) { product ->
+            isProcessing = false
             var finalProduct = product
             
             // If OCR didn't find a product code but the barcode scanner did, use that
@@ -371,8 +393,7 @@ class ScannerActivity : BaseActivity() {
         try {
             shutterSound.play(MediaActionSound.FOCUS_COMPLETE)
             // Additional beep using ToneGenerator for better visibility
-            val toneG = android.media.ToneGenerator(android.media.AudioManager.STREAM_ALARM, 100)
-            toneG.startTone(android.media.ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, 500)
+            toneGenerator?.startTone(android.media.ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, 500)
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -384,6 +405,7 @@ class ScannerActivity : BaseActivity() {
                 navigateToResult(product)
             }
             .setNegativeButton(getString(R.string.discard)) { _, _ ->
+                isProcessing = false
                 resetScannerUI()
             }
             .setCancelable(false)
@@ -519,6 +541,7 @@ class ScannerActivity : BaseActivity() {
     }
 
     private fun pickFromGallery() {
+        if (isProcessing) return
         val intent = Intent(Intent.ACTION_PICK)
         intent.type = "image/*"
         startActivityForResult(intent, 2001)
@@ -537,34 +560,43 @@ class ScannerActivity : BaseActivity() {
     }
 
     private fun handleGalleryImage(uri: Uri) {
+        isProcessing = true
         processingLayout.visibility = android.view.View.VISIBLE
         controlsLayout.visibility = android.view.View.GONE
 
         val photoFile = File(externalCacheDir, "gallery_pick.jpg")
         
-        try {
-            contentResolver.openInputStream(uri)?.use { input ->
-                FileOutputStream(photoFile).use { output ->
-                    input.copyTo(output)
+        cameraExecutor.execute {
+            try {
+                contentResolver.openInputStream(uri)?.use { input ->
+                    FileOutputStream(photoFile).use { output ->
+                        input.copyTo(output)
+                    }
+                }
+                
+                // Fix rotation if needed (gallery images often have EXIF issues)
+                fixImageRotation(photoFile)
+                
+                val bitmap = BitmapFactory.decodeFile(photoFile.absolutePath)
+                
+                runOnUiThread {
+                    if (bitmap != null) {
+                        ivCapturedPreview.setImageBitmap(bitmap)
+                        processingOverlay.setImageSize(bitmap.width, bitmap.height)
+                        getDetectedTextBlocks(photoFile)
+                    }
+                }
+                
+                processImage(photoFile)
+                
+            } catch (e: Exception) {
+                Log.e("ScannerActivity", "Error handling gallery image", e)
+                isProcessing = false
+                resetScannerUI()
+                runOnUiThread {
+                    Toast.makeText(this@ScannerActivity, "Failed to load image", Toast.LENGTH_SHORT).show()
                 }
             }
-            
-            // Fix rotation if needed (gallery images often have EXIF issues)
-            fixImageRotation(photoFile)
-            
-            val bitmap = BitmapFactory.decodeFile(photoFile.absolutePath)
-            if (bitmap != null) {
-                ivCapturedPreview.setImageBitmap(bitmap)
-                processingOverlay.setImageSize(bitmap.width, bitmap.height)
-                getDetectedTextBlocks(photoFile)
-            }
-            
-            processImage(photoFile)
-            
-        } catch (e: Exception) {
-            Log.e("ScannerActivity", "Error handling gallery image", e)
-            resetScannerUI()
-            Toast.makeText(this, "Failed to load image", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -604,5 +636,7 @@ class ScannerActivity : BaseActivity() {
     override fun onDestroy() {
         super.onDestroy()
         cameraExecutor.shutdown()
+        toneGenerator?.release()
+        toneGenerator = null
     }
 }

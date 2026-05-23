@@ -27,11 +27,14 @@ import kotlinx.coroutines.withContext
 import android.view.Menu
 import android.view.MenuItem
 import androidx.appcompat.widget.Toolbar
+import android.view.View
+import androidx.camera.core.ExperimentalGetImage
 
+@ExperimentalGetImage
 class ProductListActivity : BaseActivity() {
 
     private lateinit var recyclerView: RecyclerView
-    private lateinit var searchView: androidx.appcompat.widget.SearchView
+    private lateinit var editSearch: EditText
     private var currentSort = "id"
     private var searchQuery: String? = null
     private var activeCodeEditText: EditText? = null
@@ -40,36 +43,36 @@ class ProductListActivity : BaseActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_product_list)
 
-        val toolbar = findViewById<Toolbar>(R.id.toolbar)
-        setSupportActionBar(toolbar)
-        supportActionBar?.setDisplayHomeAsUpEnabled(true)
-        supportActionBar?.setHomeAsUpIndicator(android.R.drawable.ic_menu_view) // Using a standard icon that's likely to exist or just leave default back if home fails
-
         recyclerView = findViewById(R.id.recyclerView)
         recyclerView.layoutManager = LinearLayoutManager(this)
 
-        searchView = findViewById(R.id.searchViewList)
-        searchQuery = intent.getStringExtra("SEARCH_QUERY")
-        if (!searchQuery.isNullOrBlank()) {
-            searchView.setQuery(searchQuery, false)
+        editSearch = findViewById(R.id.editSearch)
+        findViewById<android.widget.ImageButton>(R.id.btnBack).setOnClickListener {
+            onBackPressed()
         }
 
-        searchView.setOnQueryTextListener(object : androidx.appcompat.widget.SearchView.OnQueryTextListener {
-            override fun onQueryTextSubmit(query: String?): Boolean {
-                searchQuery = query
-                loadProducts()
-                searchView.clearFocus()
-                return true
-            }
+        findViewById<android.widget.ImageButton>(R.id.btnNotifications).setOnClickListener {
+            showNotificationsDialog()
+        }
 
-            override fun onQueryTextChange(newText: String?): Boolean {
-                // Only filter when hitting enter, or when clearing search
-                if (newText.isNullOrBlank()) {
-                    searchQuery = ""
-                    loadProducts()
-                }
-                return true
+        searchQuery = intent.getStringExtra("SEARCH_QUERY")
+        if (!searchQuery.isNullOrBlank()) {
+            editSearch.setText(searchQuery)
+        }
+
+        val btnClear = findViewById<android.widget.ImageButton>(R.id.btnClearSearch)
+        btnClear.setOnClickListener {
+            editSearch.setText("")
+        }
+
+        editSearch.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                searchQuery = s?.toString()
+                btnClear.visibility = if (searchQuery.isNullOrBlank()) View.GONE else View.VISIBLE
+                loadProducts()
             }
+            override fun afterTextChanged(s: android.text.Editable?) {}
         })
 
         val filterType = intent.getStringExtra("FILTER_TYPE")
@@ -89,29 +92,6 @@ class ProductListActivity : BaseActivity() {
         }
 
         loadProducts()
-    }
-
-    override fun onCreateOptionsMenu(menu: Menu): Boolean {
-        menuInflater.inflate(R.menu.top_menu, menu)
-        // Hide the home action in menu if we use setDisplayHomeAsUpEnabled with home icon
-        menu.findItem(R.id.action_home)?.isVisible = false
-        return true
-    }
-
-    override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        return when (item.itemId) {
-            android.R.id.home -> {
-                val intent = android.content.Intent(this, MainActivity::class.java)
-                intent.flags = android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP or android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP
-                startActivity(intent)
-                true
-            }
-            R.id.action_notifications -> {
-                // Handle notifications or common logic
-                super.onOptionsItemSelected(item)
-            }
-            else -> super.onOptionsItemSelected(item)
-        }
     }
 
     private fun showFilterDialog(type: String) {
@@ -149,12 +129,18 @@ class ProductListActivity : BaseActivity() {
         lifecycleScope.launch(Dispatchers.IO) {
             var allData = db.productDao().getAllList()
             
-            // Apply Search Filter
+            // Apply Search Filter (Enhanced for multiple fields and languages)
             val filteredData = if (!searchQuery.isNullOrBlank()) {
+                val q = searchQuery!!.lowercase().trim()
                 allData.filter { product ->
-                    (product.name?.contains(searchQuery!!, ignoreCase = true) == true) ||
-                    (product.productCode?.contains(searchQuery!!, ignoreCase = true) == true) ||
-                    (product.category?.contains(searchQuery!!, ignoreCase = true) == true)
+                    (product.name.lowercase().contains(q)) ||
+                    (product.productCode.lowercase().contains(q)) ||
+                    (product.category?.lowercase()?.contains(q) == true) ||
+                    (product.expDate?.contains(q) == true) ||
+                    (product.mfgDate?.contains(q) == true) ||
+                    (product.warehouseName?.lowercase()?.contains(q) == true) ||
+                    (product.size?.lowercase()?.contains(q) == true) ||
+                    (product.quantity.contains(q))
                 }
             } else {
                 allData
@@ -207,6 +193,8 @@ class ProductListActivity : BaseActivity() {
         val editSize = dialogView.findViewById<EditText>(R.id.editSize)
         val editCategory = dialogView.findViewById<EditText>(R.id.editCategory)
         val editWarehouse = dialogView.findViewById<EditText>(R.id.editWarehouse)
+        val tilMfg = dialogView.findViewById<com.google.android.material.textfield.TextInputLayout>(R.id.tilMfg)
+        val tilExp = dialogView.findViewById<com.google.android.material.textfield.TextInputLayout>(R.id.tilExp)
 
         editCode.setText(product.productCode)
         editName.setText(product.name)
@@ -221,6 +209,22 @@ class ProductListActivity : BaseActivity() {
             activeCodeEditText = editCode
             val intent = android.content.Intent(this, BarcodeScannerActivity::class.java)
             startActivityForResult(intent, 1001)
+        }
+
+        tilMfg.setEndIconOnClickListener {
+            activeCodeEditText = editMfg
+            val intent = android.content.Intent(this, ScannerActivity::class.java)
+            intent.putExtra("SINGLE_SCAN_MODE", true)
+            intent.putExtra("SCAN_TARGET", "MFG")
+            startActivityForResult(intent, 1002)
+        }
+
+        tilExp.setEndIconOnClickListener {
+            activeCodeEditText = editExp
+            val intent = android.content.Intent(this, ScannerActivity::class.java)
+            intent.putExtra("SINGLE_SCAN_MODE", true)
+            intent.putExtra("SCAN_TARGET", "EXP")
+            startActivityForResult(intent, 1002)
         }
 
         AlertDialog.Builder(this)
@@ -244,11 +248,11 @@ class ProductListActivity : BaseActivity() {
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: android.content.Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == 1001 && resultCode == RESULT_OK) {
+        if ((requestCode == 1001 || requestCode == 1002) && resultCode == RESULT_OK) {
             val scannedCode = data?.getStringExtra("SCAN_RESULT")
             if (scannedCode != null && activeCodeEditText != null) {
                 activeCodeEditText?.setText(scannedCode)
-                Toast.makeText(this, "Barcode Scanned: $scannedCode", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Scanned: $scannedCode", Toast.LENGTH_SHORT).show()
             }
         }
     }
