@@ -2,50 +2,43 @@ import 'package:flutter/material.dart';
 
 class PremiumCard extends StatelessWidget {
   final String title;
-  final Widget child;
 
-  const PremiumCard({super.key, required this.title, required this.child});
+  const PremiumCard({super.key, required this.title});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.all(16),
       width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.grey.shade200),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withOpacity(0.05),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
         ],
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF1B5E20),
-                  ),
-                ),
-                const Icon(Icons.arrow_drop_down, color: Color(0xFF1B5E20)),
-              ],
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF1B5E20),
             ),
-            const SizedBox(height: 12),
-            child,
-          ],
-        ),
+          ),
+          const Icon(
+            Icons.arrow_drop_down_circle,
+            color: Color(0xFF2E7D32),
+            size: 32,
+          ),
+        ],
       ),
     );
   }

@@ -1,123 +1,103 @@
-import '../models/product.dart';
+import 'dart:ui';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
+import '../models/product.dart';
 
 class TextParser {
-  static final List<String> mfgKeywords = [
-    "production", "mfg", "mfd", "manufacture", "prod", "p:", "p :", "p.", "test date", "packed", "packing date", "pkd",
-    "انتاج", "تاريخ الانتاج", "تاريخ الإنتاج", "تعبئة", "فحص", "تاريخ الفحص"
+  static const List<String> _mfgKeywords = [
+    "production", "mfg", "mfd", "manufacture", "prod", "p:", "p .", "mfd date", "mfg date", "date of production", "production date", "packed", "packing date",
+    "انتاج", "تاريخ الانتاج", "تاريخ الإنتاج", "تاريخ الصنع", "تاريخ التصنيع", "صنع", "DOM", "MFD"
   ];
 
-  static final List<String> expKeywords = [
-    "expiry", "exp", "expire", "best before", "e:", "e :", "e.", "use by", "valid until", "valid till", "exp. date", "exp date",
-    "انتهاء", "تاريخ الانتهاء", "تاريخ الإنتهاء", "صالح حتى", "تاريخ الصلاحية", "صلاحية"
+  static const List<String> _expKeywords = [
+    "expiry", "exp", "ex:", "ex.", "expire", "best before", "e:", "e .", "expiry date", "exp date", "use by", "date of expiry", "date of expiration", "expiration date", "valid until", "valid till", "expier",
+    "انتهاء", "تاريخ الانتهاء", "تاريخ الإنتهاء", "تاريخ النتهاء", "DOE", "EXP", "يستخدم قبل", "ينتهي في", "صالح حتى"
   ];
 
-  static final List<String> sizeKeywords = [
-    "size", "weight", "qty", "quantity", "net", "w:", "g.", "net weight", "seeds",
-    "الحجم", "الوزن", "الكمية", "صافي", "بذور", "بذرة"
+  static const List<String> _nameKeywords = ["crop name", "product name", "name", "variety", "product", "item", "brand", "crop", "اسم الصنف", "اسم المنتج"];
+  
+  static const List<String> _excludeKeywords = ["tsw", "weight", "percent", "germination", "purity", "reg.", "no.", "lot", "tel", "gram", "origin", "cultivated"];
+
+  // Stricter date patterns to avoid decimals like 91.26
+  static final List<RegExp> _datePatterns = [
+    RegExp(r'\b\d{1,2}/\d{1,2}/\d{4}\b'), // 12/12/2024
+    RegExp(r'\b\d{1,2}-\d{1,2}-\d{4}\b'), // 12-12-2024
+    RegExp(r'\b\d{1,2}/\d{4}\b'),         // 12/2024
+    RegExp(r'\b\d{1,2}-\d{4}\b'),         // 12-2024
   ];
 
-  static final massUnits = ["kg", "g", "mg", "l", "ml", "gram", "kilogram", "غم", "غرام", "جم", "كجم"];
-  static final countUnits = ["seeds", "بذرة", "بذور", "pcs", "piece", "حبة"];
-
-  static final unitRegex = RegExp(
-    r'(\d+[,.]?\d*)\s*(kg|g|mg|l|ml|gram|kilogram|غم|غرام|جم|كجم|seeds|بذرة|بذور|pcs|piece|حبة)',
-    caseSensitive: false,
-  );
-
-  static Product parse(RecognizedText recognizedText) {
+  static Product parse(RecognizedText mlText) {
+    List<_DateElement> dateElements = [];
     String foundQuantity = "1";
     String? foundSize;
+    String foundProductCode = "";
     String? foundMfg;
     String? foundExp;
 
-    final fullText = recognizedText.text;
-    final List<_DateElement> dateElements = [];
+    final blocks = mlText.blocks.toList();
+    blocks.sort((a, b) => b.boundingBox.height.compareTo(a.boundingBox.height));
+    
+    String smartName = "Unknown Product";
+    for (var block in blocks) {
+      final text = block.text.toLowerCase();
+      if (block.boundingBox.height > 18 && !_shouldExclude(text) && !text.contains("/")) {
+        smartName = block.text.split('\n').first.trim();
+        break;
+      }
+    }
 
-    // 1. Prioritize text following keywords for Size/Quantity
-    for (TextBlock block in recognizedText.blocks) {
-      final blockText = block.text.toLowerCase();
-      for (var key in sizeKeywords) {
-        if (blockText.contains(key.toLowerCase())) {
-          final afterKey = blockText.substring(blockText.indexOf(key.toLowerCase()) + key.length);
-          final match = unitRegex.firstMatch(afterKey);
-          if (match != null) {
-            final value = match.group(0)!;
-            final unit = match.group(2)!.toLowerCase();
-            if (massUnits.contains(unit)) {
-              foundSize = value;
-            } else if (countUnits.contains(unit)) {
-              foundQuantity = match.group(1)!;
+    for (var block in mlText.blocks) {
+      final bText = block.text.toLowerCase();
+      
+      // Extraction of Weight/Size
+      if (foundSize == null) {
+        final weightRegex = RegExp(r'(\d+[,.]?\d*)\s*(gr|g|kg|ml|l|gms|gram)', caseSensitive: false);
+        final match = weightRegex.firstMatch(block.text);
+        if (match != null) foundSize = match.group(0);
+      }
+
+      // Date parsing
+      for (var line in block.lines) {
+        final lineText = line.text;
+        for (var pattern in _datePatterns) {
+          for (var match in pattern.allMatches(lineText)) {
+            String val = match.group(0)!;
+            if (_isValidAgriculturalDate(val)) {
+              dateElements.add(_DateElement(val, line));
             }
           }
         }
       }
-
-      // Extract Dates from each line for spatial context
-      for (TextLine line in block.lines) {
-        final dateRegex = RegExp(r'\b\d{1,2}[./-]\d{1,2}[./-]\d{2,4}\b');
-        for (var match in dateRegex.allMatches(line.text)) {
-          dateElements.add(_DateElement(match.group(0)!, line));
-        }
-      }
     }
 
-    // 2. Fallback to generic pattern search for missing units
-    if (foundSize == null || foundQuantity == "1") {
-      for (var match in unitRegex.allMatches(fullText)) {
-        final value = match.group(0)!;
-        final unit = match.group(2)!.toLowerCase();
-        if (foundSize == null && massUnits.contains(unit)) {
-          foundSize = value;
-        } else if (foundQuantity == "1" && countUnits.contains(unit)) {
-          foundQuantity = match.group(1)!;
-        }
-      }
-    }
-
-    // 3. Smart Date Attribution based on proximity to keywords
+    // Proximity-based Date Mapping
     for (var dateElem in dateElements) {
-      final dateRect = dateElem.line.boundingBox;
-      double minMfgDist = 9999;
-      double minExpDist = 9999;
+      double minDist = 9999;
+      int bestType = 0;
 
-      for (TextBlock block in recognizedText.blocks) {
-        final blockText = block.text.toLowerCase();
-        final blockRect = block.boundingBox;
+      for (var block in mlText.blocks) {
+        final bText = block.text.toLowerCase();
+        final bBox = block.boundingBox;
+        final dBox = dateElem.line.boundingBox;
 
-        // Calculate a simple distance (vertical distance prioritized)
-        final dy = (blockRect.top + blockRect.height / 2) - (dateRect.top + dateRect.height / 2);
-        final dx = (blockRect.left) - (dateRect.left);
-        final dist = dy.abs() * 2.0 + dx.abs() * 0.5;
+        final dy = (bBox.top + bBox.height / 2) - (dBox.top + dBox.height / 2);
+        final dx = bBox.left - dBox.left;
+        final dist = dy.abs() * 3.0 + dx.abs() * 0.1;
 
-        if (mfgKeywords.any((k) => blockText.contains(k.toLowerCase()))) {
-          if (dist < minMfgDist) minMfgDist = dist;
+        if (dist < minDist) {
+          if (_mfgKeywords.any((k) => bText.contains(k.toLowerCase()))) {
+            bestType = 1; minDist = dist;
+          } else if (_expKeywords.any((k) => bText.contains(k.toLowerCase()))) {
+            bestType = 2; minDist = dist;
+          }
         }
-        if (expKeywords.any((k) => blockText.contains(k.toLowerCase()))) {
-          if (dist < minExpDist) minExpDist = dist;
-        }
       }
-
-      if (minMfgDist < minExpDist && minMfgDist < 200) {
-        if (foundMfg == null) foundMfg = dateElem.value;
-      } else if (minExpDist < minMfgDist && minExpDist < 200) {
-        if (foundExp == null) foundExp = dateElem.value;
-      }
-    }
-
-    // 4. Default Date Logic if context attribution failed
-    if (foundMfg == null && foundExp == null && dateElements.isNotEmpty) {
-      if (dateElements.length >= 2) {
-        foundMfg = dateElements[0].value;
-        foundExp = dateElements[1].value;
-      } else {
-        foundExp = dateElements[0].value;
-      }
+      if (bestType == 1 && foundMfg == null) foundMfg = dateElem.value;
+      if (bestType == 2 && foundExp == null) foundExp = dateElem.value;
     }
 
     return Product(
-      productCode: "",
-      name: _extractSmartName(recognizedText),
+      productCode: foundProductCode,
+      name: smartName,
       mfgDate: foundMfg,
       expDate: foundExp,
       quantity: foundQuantity,
@@ -125,20 +105,22 @@ class TextParser {
     );
   }
 
-  static String _extractSmartName(RecognizedText recognizedText) {
-    if (recognizedText.blocks.isEmpty) return "Unknown Product";
+  static bool _shouldExclude(String text) {
+    return _excludeKeywords.any((k) => text.contains(k));
+  }
 
-    // Filter out technical blocks and return the most likely name
-    final noise = RegExp(r'(?i)batch|lot|weight|net|tel|phone|price|exp|mfg|prod|date|expiry|بذور|seeds|انتاج|فحص|تاريخ');
+  static bool _isValidAgriculturalDate(String date) {
+    final parts = date.split(RegExp(r'[./ \-]')).where((s) => s.isNotEmpty).toList();
+    if (parts.length < 2) return false;
+    try {
+      int m = int.parse(parts[0]);
+      int y = int.parse(parts.last);
+      return (m >= 1 && m <= 12) && ((y >= 20 && y <= 40) || (y >= 2020 && y <= 2040));
+    } catch (_) { return false; }
+  }
 
-    for (var block in recognizedText.blocks) {
-      final text = block.text.split('\n').first.trim();
-      if (text.length > 3 && !noise.hasMatch(text)) {
-        return text;
-      }
-    }
-
-    return recognizedText.blocks.first.text.split('\n').first;
+  static String cleanProductCode(String code) {
+    return code.replaceAll(RegExp(r'\][A-Z]\d|^\[C1|^\(01\)'), '').trim();
   }
 }
 

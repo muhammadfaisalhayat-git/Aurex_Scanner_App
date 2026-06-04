@@ -1,6 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:provider/provider.dart';
 import 'dashboard_screen.dart';
+import '../services/locale_provider.dart';
+import '../services/biometric_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -10,11 +14,56 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
+  final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isLoading = false;
+  bool _rememberMe = true;
+  final _biometricService = BiometricService();
+  bool _canCheckBiometrics = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkBiometrics();
+  }
+
+  Future<void> _checkBiometrics() async {
+    final isAvailable = await _biometricService.isBiometricAvailable();
+    final isEnabled = await _biometricService.isBiometricsEnabled();
+    if (mounted) {
+      setState(() {
+        _canCheckBiometrics = isAvailable && isEnabled;
+      });
+    }
+  }
+
+  Future<void> _loginWithBiometrics() async {
+    final authenticated = await _biometricService.authenticate();
+    if (authenticated && mounted) {
+      if (FirebaseAuth.instance.currentUser != null) {
+        unawaited(Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const DashboardScreen()),
+        ));
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Please log in with email first to enable biometrics.")),
+        );
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
 
   Future<void> _login() async {
+    if (!_formKey.currentState!.validate()) return;
+
     setState(() => _isLoading = true);
     try {
       await FirebaseAuth.instance.signInWithEmailAndPassword(
@@ -22,64 +71,190 @@ class _LoginScreenState extends State<LoginScreen> {
         password: _passwordController.text.trim(),
       );
       if (mounted) {
-        Navigator.pushReplacement(
+        unawaited(Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => const DashboardScreen()),
-        );
+        ));
       }
-    } catch (e) {
+    } on FirebaseAuthException catch (e) {
+      String message = "Login Failed";
+      if (e.code == 'user-not-found') {
+        message = "No user found for that email.";
+      } else if (e.code == 'wrong-password') {
+        message = "Wrong password provided.";
+      }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Login Failed: \$e")),
+          SnackBar(content: Text(message), backgroundColor: Colors.red),
         );
       }
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final localeProvider = Provider.of<LocaleProvider>(context);
+    const primaryGreen = Color(0xFF5EBA61); // Bright green from the screenshot
+
     return Scaffold(
       backgroundColor: Colors.white,
-      body: Center(
+      body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.qr_code_scanner, size: 80, color: Color(0xFF5E7D6A)),
-              const SizedBox(height: 24),
-              const Text(
-                "Aurex Scanner",
-                style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Color(0xFF5E7D6A)),
-              ),
-              const SizedBox(height: 8),
-              const Text("Lafi AL Harbi Group - Bin Awf", style: TextStyle(color: Colors.grey)),
-              const SizedBox(height: 48),
-              TextField(
-                controller: _emailController,
-                decoration: const InputDecoration(labelText: "Email", border: OutlineInputBorder()),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: _passwordController,
-                decoration: const InputDecoration(labelText: "Password", border: OutlineInputBorder()),
-                obscureText: true,
-              ),
-              const SizedBox(height: 32),
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton(
-                  onPressed: _isLoading ? null : _login,
-                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF5E7D6A)),
-                  child: _isLoading
-                      ? const CircularProgressIndicator(color: Colors.white)
-                      : const Text("LOGIN", style: TextStyle(color: Colors.white, fontSize: 18)),
+          padding: const EdgeInsets.symmetric(horizontal: 32.0),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              children: [
+                // Top Arabic/English Toggle
+                Align(
+                  alignment: Alignment.topRight,
+                  child: TextButton(
+                    onPressed: () => localeProvider.toggleLocale(),
+                    child: Text(
+                      localeProvider.locale.languageCode == 'ar' ? "English" : "العربية",
+                      style: const TextStyle(color: primaryGreen, fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 20),
+                
+                // Red/Blue 'A' App Icon
+                Image.asset(
+                  'assets/logos/app_icon.png',
+                  height: 120,
+                  errorBuilder: (context, error, stackTrace) => const Icon(Icons.change_history, size: 100, color: Colors.red),
+                ),
+                const SizedBox(height: 20),
+                
+                // Brand Name
+                const Text(
+                  "Aurex Scanner",
+                  style: TextStyle(fontSize: 34, fontWeight: FontWeight.w900, color: Color(0xFF333333)),
+                ),
+                const Text(
+                  "Aurex Scanner",
+                  style: TextStyle(fontSize: 16, color: Colors.grey),
+                ),
+                const SizedBox(height: 50),
+                
+                // Email Field
+                TextFormField(
+                  controller: _emailController,
+                  decoration: const InputDecoration(
+                    hintText: "Email",
+                    hintStyle: TextStyle(color: Colors.grey, fontSize: 18),
+                    enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.grey)),
+                    focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: primaryGreen, width: 2)),
+                  ),
+                  validator: (value) => (value == null || !value.contains('@')) ? 'Invalid email' : null,
+                ),
+                const SizedBox(height: 20),
+                
+                // Password Field
+                TextFormField(
+                  controller: _passwordController,
+                  obscureText: true,
+                  decoration: const InputDecoration(
+                    hintText: "Password",
+                    hintStyle: TextStyle(color: Colors.grey, fontSize: 18),
+                    enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.grey)),
+                    focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: primaryGreen, width: 2)),
+                  ),
+                  validator: (value) => (value == null || value.length < 6) ? 'Password too short' : null,
+                ),
+                const SizedBox(height: 20),
+                
+                // Remember Me
+                Row(
+                  children: [
+                    Checkbox(
+                      value: _rememberMe,
+                      activeColor: primaryGreen,
+                      onChanged: (val) => setState(() => _rememberMe = val!),
+                    ),
+                    const Text("Remember Me", style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
+                  ],
+                ),
+                const SizedBox(height: 30),
+                
+                // Login Button
+                SizedBox(
+                  width: double.infinity,
+                  height: 55,
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : _login,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primaryGreen,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
+                      elevation: 2,
+                    ),
+                    child: _isLoading 
+                        ? const CircularProgressIndicator(color: Colors.white) 
+                        : const Text("LOGIN", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
+                  ),
+                ),
+                const SizedBox(height: 25),
+                
+                // Biometric Icon
+                if (_canCheckBiometrics)
+                  GestureDetector(
+                    onTap: _loginWithBiometrics,
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: const BoxDecoration(
+                        color: primaryGreen,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.face, color: Colors.white, size: 40), // Or Icons.fingerprint
+                    ),
+                  )
+                else
+                   Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: const BoxDecoration(
+                      color: primaryGreen,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.face, color: Colors.white, size: 40),
+                  ),
+                
+                const SizedBox(height: 30),
+                
+                // Register & Forgot Password
+                TextButton(
+                  onPressed: () {},
+                  child: const Text("REGISTER", style: TextStyle(color: Color(0xFF4C8C4A), fontWeight: FontWeight.bold, fontSize: 16, letterSpacing: 1.2)),
+                ),
+                TextButton(
+                  onPressed: () {},
+                  child: const Text("Forgot Password?", style: TextStyle(color: primaryGreen, fontSize: 16)),
+                ),
+                
+                const SizedBox(height: 20),
+                const Divider(color: Colors.grey),
+                const SizedBox(height: 20),
+                
+                // Google Login
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: OutlinedButton(
+                    onPressed: () {},
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(color: Colors.grey.shade300),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
+                    ),
+                    child: const Text(
+                      "CONTINUE WITH GOOGLE",
+                      style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold, letterSpacing: 1.2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 30),
+              ],
+            ),
           ),
         ),
       ),

@@ -4,7 +4,9 @@ import '../models/product.dart';
 import '../services/database_service.dart';
 import '../services/firebase_service.dart';
 import '../services/erp_service.dart';
-import 'dart:io';
+import '../widgets/highlighted_image.dart';
+import 'field_scanner_screen.dart';
+import 'dart:async';
 
 class ResultScreen extends StatefulWidget {
   final Product product;
@@ -15,12 +17,15 @@ class ResultScreen extends StatefulWidget {
 }
 
 class _ResultScreenState extends State<ResultScreen> {
+  bool _isEditing = false;
   late TextEditingController _nameController;
   late TextEditingController _codeController;
   late TextEditingController _mfgController;
   late TextEditingController _expController;
   late TextEditingController _qtyController;
   late TextEditingController _sizeController;
+  String _selectedCategory = "General";
+  late TextEditingController _warehouseController;
 
   @override
   void initState() {
@@ -31,109 +36,112 @@ class _ResultScreenState extends State<ResultScreen> {
     _expController = TextEditingController(text: widget.product.expDate);
     _qtyController = TextEditingController(text: widget.product.quantity);
     _sizeController = TextEditingController(text: widget.product.size);
+    _selectedCategory = widget.product.category ?? "General";
+    _warehouseController = TextEditingController(text: widget.product.warehouseName);
+    
+    if (widget.product.id == null) _isEditing = true;
   }
 
-  Future<void> _saveProduct() async {
-    // Show loading
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const Center(child: CircularProgressIndicator()),
-    );
-
-    final updatedProduct = widget.product;
-    updatedProduct.name = _nameController.text;
-    updatedProduct.productCode = _codeController.text;
-    updatedProduct.mfgDate = _mfgController.text;
-    updatedProduct.expDate = _expController.text;
-    updatedProduct.quantity = _qtyController.text;
-    updatedProduct.size = _sizeController.text;
-
-    final dbService = Provider.of<DatabaseService>(context, listen: false);
-    final firebaseService = Provider.of<FirebaseService>(context, listen: false);
-    final erpService = Provider.of<ErpService>(context, listen: false);
+  Future<void> _save() async {
+    showDialog(context: context, barrierDismissible: false, builder: (c) => const Center(child: CircularProgressIndicator()));
+    final p = widget.product;
+    p.name = _nameController.text; p.productCode = _codeController.text; p.mfgDate = _mfgController.text;
+    p.expDate = _expController.text; p.quantity = _qtyController.text; p.size = _sizeController.text;
+    p.category = _selectedCategory; p.warehouseName = _warehouseController.text;
 
     try {
-      // 1. Save Locally
-      await dbService.insertProduct(updatedProduct);
-
-      // 2. Try Background Sync
-      await firebaseService.backupAll([updatedProduct]);
-
-      // 3. Optional: Push to Main ERP Website
-      await erpService.pushToErp(updatedProduct);
-
-      if (!mounted) return;
-      Navigator.pop(context); // Close loading
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Sync Complete: Saved to Local, Cloud & ERP")));
-      Navigator.pop(context); // Go back to Dashboard
+      await Provider.of<DatabaseService>(context, listen: false).insertProduct(p);
+      await Provider.of<FirebaseService>(context, listen: false).backupAll([p]);
+      if (mounted) { Navigator.pop(context); Navigator.pop(context, true); }
     } catch (e) {
-      if (!mounted) return;
-      Navigator.pop(context); // Close loading
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error saving: $e")));
-      Navigator.pop(context);
+      if (mounted) { Navigator.pop(context); ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e"))); }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    const primaryGreen = Color(0xFF388E3C);
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text("Product Details"),
-        actions: [
-          IconButton(onPressed: _saveProduct, icon: const Icon(Icons.check)),
-        ],
+        title: const Text("Product Details", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        backgroundColor: primaryGreen,
+        leading: const Icon(Icons.grid_view, color: Colors.white),
+        actions: [IconButton(icon: const Icon(Icons.notifications, color: Colors.white), onPressed: () {})],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            if (widget.product.imagePath != null)
-              ClipRRect(
-                borderRadius: BorderRadius.circular(15),
-                child: Image.file(File(widget.product.imagePath!), height: 200, width: double.infinity, fit: BoxFit.cover),
-              ),
-            const SizedBox(height: 24),
-            _buildTextField("Product Name", _nameController, Icons.shopping_basket),
-            _buildTextField("Product Code", _codeController, Icons.qr_code),
-            Row(
-              children: [
-                Expanded(child: _buildTextField("MFG Date", _mfgController, Icons.date_range)),
+        child: Column(children: [
+          if (widget.product.imagePath != null) 
+            HighlightedImage(
+              imagePath: widget.product.imagePath!, 
+              mfgBox: widget.product.mfgBox, 
+              expBox: widget.product.expBox,
+              height: 220
+            ),
+          
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(children: [
+              _buildField("Product Code", _codeController),
+              _buildField("Product Name", _nameController, isAr: true),
+              Row(children: [
+                Expanded(child: _buildField("MFG Date", _mfgController)),
                 const SizedBox(width: 10),
-                Expanded(child: _buildTextField("EXP Date", _expController, Icons.event_available, color: Colors.red)),
-              ],
-            ),
-            _buildTextField("Quantity", _qtyController, Icons.production_quantity_limits),
-            _buildTextField("Size/Weight", _sizeController, Icons.scale),
-            const SizedBox(height: 40),
-            SizedBox(
-              width: double.infinity,
-              height: 55,
-              child: ElevatedButton(
-                onPressed: _saveProduct,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF5E7D6A),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                Expanded(child: _buildField("EXP Date", _expController)),
+              ]),
+              
+              Container(
+                width: double.infinity, margin: const EdgeInsets.only(bottom: 15),
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.grey.shade300)),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: _selectedCategory,
+                    items: ["General", "Seeds", "Fertilizer", "Tools"].map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+                    onChanged: (v) => setState(() => _selectedCategory = v!),
+                  ),
                 ),
-                child: const Text("SAVE TO HISTORY", style: TextStyle(color: Colors.white, fontSize: 18)),
               ),
-            ),
-          ],
-        ),
+
+              _buildField("Warehouse", _warehouseController, isAr: true),
+              _buildField("Quantity", _qtyController),
+              _buildField("Size/Weight", _sizeController),
+              
+              const SizedBox(height: 20),
+              SizedBox(width: double.infinity, height: 60, child: ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF5E7D6A), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
+                onPressed: _save, child: const Text("UPDATE PRODUCT", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+              )),
+            ]),
+          )
+        ]),
       ),
     );
   }
 
-  Widget _buildTextField(String label, TextEditingController controller, IconData icon, {Color? color}) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16.0),
+  Widget _buildField(String lbl, TextEditingController ctrl, {bool isAr = false}) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(color: Colors.grey.shade200, borderRadius: BorderRadius.circular(8)),
       child: TextField(
-        controller: controller,
+        controller: ctrl, textAlign: isAr ? TextAlign.right : TextAlign.left,
         decoration: InputDecoration(
-          labelText: label,
-          prefixIcon: Icon(icon, color: color),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-          labelStyle: TextStyle(color: color),
+          labelText: lbl, labelStyle: const TextStyle(color: Colors.grey, fontSize: 14),
+          suffixIcon: IconButton(
+            icon: const Icon(Icons.qr_code_scanner, color: Colors.grey), 
+            onPressed: () async {
+              final result = await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => FieldScannerScreen(fieldName: lbl)),
+              );
+              if (result != null && mounted) {
+                setState(() {
+                  ctrl.text = result.toString();
+                });
+              }
+            }
+          ),
+          border: InputBorder.none, contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         ),
       ),
     );

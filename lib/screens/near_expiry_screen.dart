@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:intl/intl.dart';
 import '../models/product.dart';
 import '../services/database_service.dart';
 import '../widgets/product_card.dart';
+import '../utils/date_utils.dart';
+import 'result_screen.dart';
 
 class NearExpiryScreen extends StatefulWidget {
   const NearExpiryScreen({super.key});
@@ -24,18 +25,10 @@ class _NearExpiryScreenState extends State<NearExpiryScreen> {
   void _loadFilteredProducts() {
     setState(() {
       _productsFuture = Provider.of<DatabaseService>(context, listen: false).getProducts().then((list) {
-        final now = DateTime.now();
-        final format = DateFormat("dd/MM/yyyy");
-
         return list.where((p) {
           if (p.expDate == null) return false;
-          try {
-            final exp = format.parse(p.expDate!);
-            final diff = exp.difference(now).inDays;
-            return diff <= 30; // Near expiry: 30 days or already expired
-          } catch (e) {
-            return false;
-          }
+          final days = AppDateUtils.calculateRemainingDays(p.expDate);
+          return days <= 30; // Near expiry: 30 days or already expired
         }).toList();
       });
     });
@@ -64,7 +57,14 @@ class _NearExpiryScreenState extends State<NearExpiryScreen> {
             itemBuilder: (context, index) {
               return ProductCard(
                 product: products[index],
-                onTap: () {},
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => ResultScreen(product: products[index]),
+                    ),
+                  ).then((_) => _loadFilteredProducts());
+                },
               );
             },
           );

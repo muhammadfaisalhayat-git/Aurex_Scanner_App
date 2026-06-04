@@ -19,11 +19,18 @@ class DatabaseService {
     String path = join(await getDatabasesPath(), 'aurex_scanner.db');
     return await openDatabase(
       path,
-      version: 1,
+      version: 3, // Incremented to version 3 to add coordinate columns
       onCreate: (db, version) {
         return db.execute(
-          "CREATE TABLE products(id INTEGER PRIMARY KEY AUTOINCREMENT, productCode TEXT, name TEXT, mfgDate TEXT, expDate TEXT, quantity TEXT, size TEXT, category TEXT, imagePath TEXT, warehouseName TEXT, barcode TEXT, isSynced INTEGER, groupId TEXT, companyId TEXT)",
+          "CREATE TABLE products(id INTEGER PRIMARY KEY AUTOINCREMENT, productCode TEXT, name TEXT, mfgDate TEXT, expDate TEXT, quantity TEXT, size TEXT, category TEXT, imagePath TEXT, warehouseName TEXT, barcode TEXT, isSynced INTEGER, mfgBox TEXT, expBox TEXT, groupId TEXT, companyId TEXT)",
         );
+      },
+      onUpgrade: (db, oldVersion, newVersion) async {
+        if (oldVersion < 3) {
+          // Add missing columns for highlighting coordinates if they don't exist
+          try { await db.execute("ALTER TABLE products ADD COLUMN mfgBox TEXT"); } catch (_) {}
+          try { await db.execute("ALTER TABLE products ADD COLUMN expBox TEXT"); } catch (_) {}
+        }
       },
     );
   }
@@ -35,6 +42,21 @@ class DatabaseService {
       product.toMap(),
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
+  }
+
+  Future<void> batchInsertProducts(List<Product> products) async {
+    final db = await database;
+    await db.transaction((txn) async {
+      var batch = txn.batch();
+      for (var product in products) {
+        batch.insert(
+          'products',
+          product.toMap(),
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+      }
+      await batch.commit(noResult: true);
+    });
   }
 
   Future<List<Product>> getProducts() async {

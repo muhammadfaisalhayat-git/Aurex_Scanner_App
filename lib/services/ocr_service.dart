@@ -17,7 +17,7 @@ class OCRService {
     }
 
     // 2. Perform OCR
-    final RecognizedText recognizedText = await _textRecognizer.processImage(inputImage);
+    await _textRecognizer.processImage(inputImage);
 
     // Here we will implement the same regex logic from your Kotlin TextParser
     // for extracting MFG and EXP dates.
