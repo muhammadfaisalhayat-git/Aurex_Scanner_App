@@ -20,7 +20,7 @@ subprojects {
     project.evaluationDependsOn(":app")
 }
 
-// FORCE ALL PLUGINS TO USE SDK 36 (ROOT CAUSE FIX)
+// FORCE ALL PLUGINS TO USE SDK 36 (THE ONLY WAY TO FIX BAKLAVA ERROR)
 subprojects {
     val forceSdkVersion = {
         if (project.hasProperty("android")) {

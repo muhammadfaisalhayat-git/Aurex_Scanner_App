@@ -1,18 +1,28 @@
 import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as p;
 import '../models/product.dart';
 import 'database_service.dart';
+import 'dart:io';
 
 class FirebaseService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  
   final FirebaseDatabase _db = FirebaseDatabase.instance;
+  final FirebaseStorage _storage = FirebaseStorage.instance;
 
   DatabaseReference get _productRef {
     final user = _auth.currentUser;
     if (user == null) throw Exception("User not logged in");
     return _db.ref("users/${user.uid}/products");
+  }
+
+  Reference get _storageRef {
+    final user = _auth.currentUser;
+    if (user == null) throw Exception("User not logged in");
+    return _storage.ref().child("users/${user.uid}/images");
   }
 
   Future<void> backupAll(List<Product> products, {Function(int current, int total)? onProgress}) async {
@@ -24,6 +34,17 @@ class FirebaseService {
       String key = product.productCode.replaceAll(RegExp(r'[.#$\[\]/]'), '_');
       if (key.isEmpty) key = "ID_${product.id}";
       
+      // Upload image to Firebase Storage
+      if (product.imagePath != null && File(product.imagePath!).existsSync()) {
+        try {
+          final File imageFile = File(product.imagePath!);
+          final String fileName = "$key.jpg";
+          await _storageRef.child(fileName).putFile(imageFile);
+        } catch (e) {
+          debugPrint("Storage upload error for $key: $e");
+        }
+      }
+
       product.isSynced = true;
       updates[key] = product.toMap();
       
@@ -35,13 +56,19 @@ class FirebaseService {
   }
 
   Future<int?> restoreAll({Function(int current, int total)? onProgress}) async {
-    // 1. Enable Persistence for faster lookup
-    _db.setPersistenceEnabled(true);
-
     final snapshot = await _productRef.get();
     if (!snapshot.exists || snapshot.value == null) return null;
 
     final dbService = DatabaseService();
+    final directory = await getApplicationDocumentsDirectory();
+    final String imagesPath = p.join(directory.path, 'product_images');
+    
+    // Ensure the product_images directory exists
+    final imagesDir = Directory(imagesPath);
+    if (!await imagesDir.exists()) {
+      await imagesDir.create(recursive: true);
+    }
+
     List<Product> products = [];
 
     if (snapshot.value is Map) {
@@ -51,15 +78,27 @@ class FirebaseService {
       
       for (var entry in data.entries) {
         try {
-          // Parse product data
           final productData = Map<dynamic, dynamic>.from(entry.value as Map);
+          String key = entry.key.toString();
           
-          // DO NOT nullify ID here if we want to keep cloud mapping, 
-          // but for local UI we need to ensure they are unique.
-          // Re-generating IDs locally ensures they show up as separate cards.
-          productData['id'] = null; 
+          // Try to download image from storage
+          final String localImagePath = p.join(imagesPath, "$key.jpg");
+          final File localFile = File(localImagePath);
+          
+          try {
+            // Check if it exists on server first to avoid generic error noise
+            final metadata = await _storageRef.child("$key.jpg").getMetadata();
+            if (metadata.size != null && metadata.size! > 0) {
+              await _storageRef.child("$key.jpg").writeToFile(localFile);
+              productData['imagePath'] = localImagePath;
+            }
+          } catch (e) {
+            debugPrint("Image not found or download failed for $key: $e");
+          }
 
+          productData['id'] = null; 
           products.add(Product.fromMap(productData));
+          
           count++;
           if (onProgress != null) onProgress(count, total);
         } catch (e) {
@@ -69,13 +108,22 @@ class FirebaseService {
     }
 
     if (products.isNotEmpty) {
-      // 2. Clear local database to prevent mixing old and new data
       await dbService.deleteAll();
-      
-      // 3. Perform batch insert with unique local IDs
       await dbService.batchInsertProducts(products);
     }
     
     return products.length;
+  }
+
+  Future<void> wipeDataFromServer() async {
+    await _productRef.remove();
+    try {
+      final listResult = await _storageRef.listAll();
+      for (var item in listResult.items) {
+        await item.delete();
+      }
+    } catch (e) {
+      debugPrint("Storage wipe error: $e");
+    }
   }
 }

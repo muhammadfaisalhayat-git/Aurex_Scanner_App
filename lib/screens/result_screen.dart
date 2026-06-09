@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import '../models/product.dart';
 import '../services/database_service.dart';
 import '../services/firebase_service.dart';
-import '../services/erp_service.dart';
+import '../services/learning_service.dart';
 import '../widgets/highlighted_image.dart';
 import 'field_scanner_screen.dart';
 import 'dart:async';
@@ -44,17 +44,34 @@ class _ResultScreenState extends State<ResultScreen> {
 
   Future<void> _save() async {
     showDialog(context: context, barrierDismissible: false, builder: (c) => const Center(child: CircularProgressIndicator()));
+    
     final p = widget.product;
-    p.name = _nameController.text; p.productCode = _codeController.text; p.mfgDate = _mfgController.text;
-    p.expDate = _expController.text; p.quantity = _qtyController.text; p.size = _sizeController.text;
-    p.category = _selectedCategory; p.warehouseName = _warehouseController.text;
+    p.name = _nameController.text; 
+    p.productCode = _codeController.text; 
+    p.mfgDate = _mfgController.text;
+    p.expDate = _expController.text; 
+    p.quantity = _qtyController.text; 
+    p.size = _sizeController.text;
+    p.category = _selectedCategory; 
+    p.warehouseName = _warehouseController.text;
 
     try {
+      // 1. Core Logic: Self-Learning from this entry
+      await LearningService().learnFromCorrection(p);
+
+      // 2. Persist to Database & Cloud
       await Provider.of<DatabaseService>(context, listen: false).insertProduct(p);
       await Provider.of<FirebaseService>(context, listen: false).backupAll([p]);
-      if (mounted) { Navigator.pop(context); Navigator.pop(context, true); }
+      
+      if (mounted) { 
+        Navigator.pop(context); // Close loading
+        Navigator.pop(context, true); // Return with refresh signal
+      }
     } catch (e) {
-      if (mounted) { Navigator.pop(context); ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e"))); }
+      if (mounted) { 
+        Navigator.pop(context); 
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e"))); 
+      }
     }
   }
 

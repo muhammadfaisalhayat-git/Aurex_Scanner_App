@@ -6,6 +6,7 @@ import 'package:audioplayers/audioplayers.dart';
 import 'dart:async';
 import 'dart:io';
 import '../services/text_parser.dart';
+import '../services/learning_service.dart';
 import '../models/product.dart';
 import 'result_screen.dart';
 import 'product_list_screen.dart';
@@ -36,6 +37,7 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
   final _audioPlayer = AudioPlayer();
   
   Timer? _analysisTimer;
+  final Set<String> _beepedData = {};
 
   @override
   void initState() {
@@ -54,9 +56,19 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
     final cameras = await availableCameras();
     if (cameras.isEmpty) return;
     
+    // Target the main back camera
+    CameraDescription? mainCamera;
+    for (var c in cameras) {
+      if (c.lensDirection == CameraLensDirection.back) {
+        mainCamera = c;
+        break;
+      }
+    }
+    mainCamera ??= cameras[0];
+
     _controller = CameraController(
-      cameras[0], 
-      ResolutionPreset.max, // Ultra-high res for accuracy
+      mainCamera, 
+      ResolutionPreset.max,
       enableAudio: false,
     );
     
@@ -72,7 +84,6 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
   }
 
   void _startRealtimeAnalysis() {
-    // Throttled detection every 1.2 seconds for perfect performance (no lag)
     _analysisTimer = Timer.periodic(const Duration(milliseconds: 1200), (timer) async {
       if (_isProcessing || _isAnalyzing || _controller == null || !_controller!.value.isInitialized) return;
       
@@ -80,18 +91,44 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
       try {
         final image = await _controller!.takePicture();
         final inputImage = InputImage.fromFilePath(image.path);
-        final recognizedText = await _textRecognizer.processImage(inputImage);
+        
+        final results = await Future.wait([
+          _barcodeScanner.processImage(inputImage),
+          _textRecognizer.processImage(inputImage),
+        ]);
+
+        final barcodes = results[0] as List<Barcode>;
+        final recognizedText = results[1] as RecognizedText;
         
         List<_HighlightBox> boxes = [];
+        bool newlyDetected = false;
+
+        // 1. Check Barcodes
+        if (barcodes.isNotEmpty) {
+           final code = barcodes.first.rawValue ?? "";
+           if (!_beepedData.contains(code)) {
+              newlyDetected = true;
+              _beepedData.add(code);
+           }
+           if (barcodes.first.boundingBox != null) {
+              boxes.add(_HighlightBox(barcodes.first.boundingBox!, Colors.blue));
+           }
+        }
+
+        // 2. Check Dates
         final dateRegex = RegExp(r'\b\d{1,2}[./ \-]\d{2,4}\b');
-        
         for (var block in recognizedText.blocks) {
           final blockText = block.text.toLowerCase();
           for (var line in block.lines) {
             if (dateRegex.hasMatch(line.text)) {
-              Color color = Colors.green; // Default: Production
+              final val = dateRegex.firstMatch(line.text)!.group(0)!;
+              if (!_beepedData.contains(val)) {
+                 newlyDetected = true;
+                 _beepedData.add(val);
+              }
+              Color color = Colors.green; 
               if (blockText.contains("exp") || blockText.contains("expire") || blockText.contains("valid") || blockText.contains("انتهاء")) {
-                color = Colors.red; // Expiry
+                color = Colors.red;
               }
               boxes.add(_HighlightBox(line.boundingBox, color));
             }
@@ -99,12 +136,12 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
         }
 
         if (mounted && boxes.isNotEmpty) {
-          // Play Beep on detection
-          unawaited(_audioPlayer.play(AssetSource('sounds/beep.mp3')).catchError((_) {}));
+          if (newlyDetected) {
+            unawaited(_audioPlayer.play(AssetSource('sounds/beep.mp3')).catchError((_) {}));
+          }
           setState(() {
             _realtimeHighlights = boxes;
           });
-          // Visual feedback lasts 600ms
           Future.delayed(const Duration(milliseconds: 600), () {
             if (mounted) setState(() => _realtimeHighlights = []);
           });
@@ -125,8 +162,6 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
     try {
       final image = await _controller!.takePicture();
       _capturedImagePath = image.path;
-      
-      // Manual capture beep
       await _audioPlayer.play(AssetSource('sounds/beep.mp3')).catchError((_) {});
       
       if (mounted) setState(() {});
@@ -140,11 +175,16 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
         });
       }
 
-      // Sweep Animation Delay (Matches Laser Hover)
+      // 1. Show Professional Sweep Animation
       await Future.delayed(const Duration(seconds: 3));
 
+      // 2. Comprehensive Field Analysis
       final barcodes = await _barcodeScanner.processImage(inputImage);
       Product product = TextParser.parse(recognizedText);
+      
+      // 3. APPLY SELF-LEARNING INTELLIGENCE
+      product = LearningService().applyIntelligence(product);
+
       product.barcode = barcodes.isNotEmpty ? barcodes.first.rawValue : null;
       product.productCode = product.barcode ?? product.productCode;
       product.imagePath = image.path;
@@ -187,7 +227,7 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
         children: [
           Positioned.fill(child: CameraPreview(_controller!)),
           
-          // Real-time Visual Highlights (Green/Red Rects)
+          // Real-time Visual Circles (mapped based on preview size)
           ..._realtimeHighlights.map((box) => Positioned(
             left: box.rect.left * (screenWidth / 1000.0), 
             top: box.rect.top * (screenHeight / 1000.0),
@@ -201,7 +241,7 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
             ),
           )),
 
-          // High-Visibility Frame
+          // Frame Overlay
           Container(
             decoration: const ShapeDecoration(
               shape: _LegacyScannerOverlay(laserPosition: 0, showLaser: false),
@@ -258,7 +298,8 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
     return AnimatedBuilder(
       animation: _laserAnimation,
       builder: (context, child) {
-        final double laserY = MediaQuery.of(context).size.height * _laserAnimation.value;
+        final double h = MediaQuery.of(context).size.height;
+        final double laserY = h * _laserAnimation.value;
         return Container(
           color: Colors.black,
           child: Stack(

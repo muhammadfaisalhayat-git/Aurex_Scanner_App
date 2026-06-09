@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
+import 'package:audioplayers/audioplayers.dart';
 import '../services/biometric_service.dart';
 import '../services/firebase_service.dart';
 import '../services/database_service.dart';
@@ -16,6 +17,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String _selectedTheme = "System Default";
   bool _biometricsEnabled = false;
   final _biometricService = BiometricService();
+  final _audioPlayer = AudioPlayer();
   final user = FirebaseAuth.instance.currentUser;
 
   @override
@@ -29,42 +31,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
     setState(() { _biometricsEnabled = enabled; });
   }
 
-  Future<void> _showConfirmPassword(VoidCallback onVerified) async {
-    final passController = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text("Confirm Identity"),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text("Please enter your current password to continue."),
-            const SizedBox(height: 20),
-            TextField(
-              controller: passController,
-              obscureText: true,
-              decoration: const InputDecoration(labelText: "Current Password", border: OutlineInputBorder()),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("CANCEL", style: TextStyle(color: Colors.green))),
-          TextButton(
-            onPressed: () async {
-              try {
-                AuthCredential cred = EmailAuthProvider.credential(email: user!.email!, password: passController.text);
-                await user!.reauthenticateWithCredential(cred);
-                Navigator.pop(ctx);
-                onVerified();
-              } catch (e) {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Invalid password")));
-              }
-            },
-            child: const Text("VERIFY", style: TextStyle(color: Colors.green)),
-          ),
-        ],
-      ),
-    );
+  Future<void> _testSound() async {
+    try {
+      await _audioPlayer.play(AssetSource('sounds/beep.mp3'));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Playing test sound...")));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Sound failed: Make sure beep.mp3 is in assets/sounds/"), backgroundColor: Colors.red));
+    }
   }
 
   @override
@@ -83,6 +56,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            const Text("Configuration", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            _buildActionBtn("TEST SCAN BEEP SOUND", Icons.volume_up, _testSound),
+            
+            const Divider(height: 40),
             const Text("Theme", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             RadioListTile(title: const Text("System Default"), value: "System Default", groupValue: _selectedTheme, activeColor: primaryGreen, onChanged: (v) => setState(() => _selectedTheme = v!)),
             RadioListTile(title: const Text("Light"), value: "Light", groupValue: _selectedTheme, activeColor: primaryGreen, onChanged: (v) => setState(() => _selectedTheme = v!)),
@@ -90,7 +67,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
             
             const Divider(),
             const Text("Enable Biometric Login", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const Text("Use fingerprint or face recognition for faster access.", style: TextStyle(color: Colors.grey, fontSize: 14)),
             SwitchListTile(
               value: _biometricsEnabled,
               activeColor: primaryGreen,
@@ -120,10 +96,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   children: [
                     const Text("Email", style: TextStyle(color: Colors.grey, fontSize: 12)),
                     Text(user?.email ?? "", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                    const Divider(),
-                    TextButton.icon(onPressed: () => _showConfirmPassword(() {}), icon: const Icon(Icons.edit, color: primaryGreen), label: const Text("CHANGE EMAIL", style: TextStyle(color: primaryGreen, fontWeight: FontWeight.bold))),
-                    const Divider(),
-                    TextButton.icon(onPressed: () => _showConfirmPassword(() {}), icon: const Icon(Icons.lock_outline, color: primaryGreen), label: const Text("CHANGE PASSWORD", style: TextStyle(color: primaryGreen, fontWeight: FontWeight.bold))),
                   ],
                 ),
               ),
@@ -132,17 +104,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
             _buildActionBtn("CLEAN CLOUD BACKUPS", Icons.delete_outline, () {}),
             _buildActionBtn("BACKUP TO CLOUD (RTDB)", Icons.cloud_upload_outlined, () {}),
             _buildActionBtn("RESTORE FROM CLOUD (RTDB)", Icons.settings_backup_restore, () {}),
-            
-            const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              height: 55,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.red, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5))),
-                onPressed: () => _showConfirmPassword(() {}),
-                child: const Text("WIPE SERVER DATA", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, decoration: TextDecoration.underline)),
-              ),
-            ),
           ],
         ),
       ),
