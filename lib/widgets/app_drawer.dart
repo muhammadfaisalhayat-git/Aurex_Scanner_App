@@ -79,17 +79,14 @@ class _AppDrawerState extends State<AppDrawer> {
                 }, itemBgColor),
                 
                 _buildDrawerItem(context, Icons.save_outlined, isAr ? "نسخ احتياطي للخادم" : "Backup to Server", () async {
-                  // Capture necessary services before popping the drawer context
                   final fs = Provider.of<FirebaseService>(context, listen: false);
                   final ds = Provider.of<DatabaseService>(context, listen: false);
-                  final scaffoldMessenger = ScaffoldMessenger.of(context);
-                  final navigator = Navigator.of(context);
-
-                  navigator.pop(); // Close drawer
+                  
+                  Navigator.pop(context); // Close drawer
                   
                   final products = await ds.getProducts();
                   if (products.isEmpty) {
-                    scaffoldMessenger.showSnackBar(SnackBar(content: Text(isAr ? "لا توجد بيانات للنسخ الاحتياطي" : "No local data to backup")));
+                    if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(isAr ? "لا توجد بيانات للنسخ الاحتياطي" : "No local data to backup")));
                     return;
                   }
                   
@@ -100,11 +97,8 @@ class _AppDrawerState extends State<AppDrawer> {
                 }, itemBgColor),
                 
                 _buildDrawerItem(context, Icons.download_outlined, isAr ? "استعادة من الخادم" : "Restore from Server", () {
-                  // Capture necessary services before popping the drawer context
                   final fs = Provider.of<FirebaseService>(context, listen: false);
-                  final navigator = Navigator.of(context);
-
-                  navigator.pop(); // Close drawer
+                  Navigator.pop(context); // Close drawer
                   
                   _showGlobalProgressDialog(context, isAr ? "استعادة" : "Restore", isAr ? "جاري الاستعادة..." : "Restoring data...", (onProgressUpdate) async {
                     int? count = await fs.restoreAll(onProgress: (current, total) => onProgressUpdate(current, total));
@@ -166,15 +160,14 @@ class _AppDrawerState extends State<AppDrawer> {
     );
   }
 
-  // Use a context that survives the drawer closing (the Scaffold context)
   void _showGlobalProgressDialog(BuildContext context, String actionType, String title, Future<dynamic> Function(Function(int, int)) task) {
     final progressNotifier = ValueNotifier<double>(0);
     final statusNotifier = ValueNotifier<String>("Connecting...");
+    bool isDialogVisible = true;
     
-    // Create a Completer to know when the task finishes
-    final completer = Completer<dynamic>();
+    // Capture root navigator BEFORE drawer is closed or context becomes unmounted
+    final NavigatorState rootNavigator = Navigator.of(context, rootNavigator: true);
 
-    // Open the progress dialog on the root navigator so it persists
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -188,7 +181,7 @@ class _AppDrawerState extends State<AppDrawer> {
               ValueListenableBuilder<double>(
                 valueListenable: progressNotifier,
                 builder: (context, value, child) => LinearProgressIndicator(
-                  value: (value > 0 && value <= 1.0) ? value : null,
+                  value: (value > 0 && value < 1.0) ? value : (value >= 1.0 ? 1.0 : null),
                   backgroundColor: Colors.grey[200],
                   valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF388E3C)),
                 ),
@@ -196,12 +189,13 @@ class _AppDrawerState extends State<AppDrawer> {
               const SizedBox(height: 20),
               ValueListenableBuilder<String>(
                 valueListenable: statusNotifier,
-                builder: (context, status, child) => Text(status),
+                builder: (context, status, child) => Text(status, style: const TextStyle(fontWeight: FontWeight.bold)),
               ),
               const SizedBox(height: 20),
               TextButton(
                 onPressed: () { 
-                   Navigator.of(dialogContext).pop(); // Close loading manually
+                   isDialogVisible = false;
+                   Navigator.of(dialogContext).pop(); 
                 },
                 child: const Text("RUN IN BACKGROUND"),
               ),
@@ -211,7 +205,6 @@ class _AppDrawerState extends State<AppDrawer> {
       },
     );
 
-    // Run the background task
     Future(() async {
       try {
         final result = await task((c, t) {
@@ -221,46 +214,47 @@ class _AppDrawerState extends State<AppDrawer> {
           }
         });
         
-        await Future.delayed(const Duration(milliseconds: 800));
+        await Future.delayed(const Duration(milliseconds: 600));
 
-        // 1. Close the progress dialog automatically
-        Navigator.of(context, rootNavigator: true).pop();
+        // 1. Close progress dialog using the CAPTURED root navigator
+        if (isDialogVisible) {
+          rootNavigator.pop();
+          isDialogVisible = false;
+        }
         
-        // 2. Show the Success Popup on the main context
-        if (context.mounted) {
-          showDialog(
-            context: context,
-            builder: (ctx) => AlertDialog(
-              title: Row(
-                children: [
-                  const Icon(Icons.check_circle, color: Colors.green),
-                  const SizedBox(width: 10),
-                  Text("$actionType Complete"),
-                ],
-              ),
-              content: Text(result is int ? "Successfully restored $result products." : "Task completed successfully."),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  child: const Text("OK"),
-                )
+        // 2. Show Success Popup (Informing the user)
+        // Use a small delay to ensure the previous pop finished
+        await Future.delayed(const Duration(milliseconds: 200));
+        
+        showDialog(
+          context: rootNavigator.context,
+          builder: (ctx) => AlertDialog(
+            title: Row(
+              children: [
+                const Icon(Icons.check_circle, color: Colors.green),
+                const SizedBox(width: 10),
+                Text("$actionType Complete"),
               ],
             ),
-          );
-        }
+            content: Text(result is int ? "Successfully restored $result products." : "Task completed successfully."),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("OK")),
+            ],
+          ),
+        );
       } catch (e) {
-        // Handle Error: Close dialog and show error
-        Navigator.of(context, rootNavigator: true).pop();
-        if (context.mounted) {
-          showDialog(
-            context: context,
-            builder: (ctx) => AlertDialog(
-              title: const Text("Error"),
-              content: Text(e.toString()),
-              actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("OK"))],
-            ),
-          );
+        if (isDialogVisible) {
+          rootNavigator.pop();
+          isDialogVisible = false;
         }
+        showDialog(
+          context: rootNavigator.context,
+          builder: (ctx) => AlertDialog(
+            title: const Text("Error"),
+            content: Text(e.toString()),
+            actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("OK"))],
+          ),
+        );
       }
     });
   }

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
 import 'dashboard_screen.dart';
+import 'register_screen.dart';
 import '../services/locale_provider.dart';
 import '../services/biometric_service.dart';
 
@@ -224,7 +225,9 @@ class _LoginScreenState extends State<LoginScreen> {
                 
                 // Register & Forgot Password
                 TextButton(
-                  onPressed: () {},
+                  onPressed: () {
+                    Navigator.push(context, MaterialPageRoute(builder: (context) => const RegisterScreen()));
+                  },
                   child: const Text("REGISTER", style: TextStyle(color: Color(0xFF4C8C4A), fontWeight: FontWeight.bold, fontSize: 16, letterSpacing: 1.2)),
                 ),
                 TextButton(

@@ -94,6 +94,18 @@ class _ResultScreenState extends State<ResultScreen> {
               mfgBox: widget.product.mfgBox, 
               expBox: widget.product.expBox,
               height: 220
+            )
+          else
+            Container(
+              height: 220, width: double.infinity, color: Colors.grey.shade200,
+              child: const Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.image_not_supported, size: 60, color: Colors.grey),
+                  SizedBox(height: 10),
+                  Text("No image available", style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+                ],
+              ),
             ),
           
           Padding(

@@ -29,6 +29,24 @@ class NotificationService {
     // Request permissions for Android 13+
     _notificationsPlugin.resolvePlatformSpecificImplementation<
         AndroidFlutterLocalNotificationsPlugin>()?.requestNotificationsPermission();
+        
+    // Create the channel explicitly to ensure sound is registered
+    _createNotificationChannel();
+  }
+
+  Future<void> _createNotificationChannel() async {
+    const AndroidNotificationChannel channel = AndroidNotificationChannel(
+      'expiry_alerts',
+      'Expiry Alerts',
+      description: 'Notifications for expired or near-expiry products',
+      importance: Importance.max,
+      playSound: true,
+      sound: RawResourceAndroidNotificationSound('beep'),
+      enableVibration: true,
+    );
+
+    await _notificationsPlugin.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>()?.createNotificationChannel(channel);
   }
 
   Future<void> showNotification({
@@ -45,7 +63,7 @@ class NotificationService {
       importance: Importance.max,
       priority: Priority.high,
       showWhen: true,
-      sound: RawResourceAndroidNotificationSound('beep'), // Use our beep sound
+      sound: RawResourceAndroidNotificationSound('beep'),
       playSound: true,
       enableVibration: true,
     );

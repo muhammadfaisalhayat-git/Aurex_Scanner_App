@@ -5,8 +5,8 @@ import 'package:google_mlkit_barcode_scanning/google_mlkit_barcode_scanning.dart
 import 'package:audioplayers/audioplayers.dart';
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 import '../services/text_parser.dart';
-import '../services/learning_service.dart';
 import '../models/product.dart';
 import 'result_screen.dart';
 import 'product_list_screen.dart';
@@ -34,15 +34,20 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
 
   final _textRecognizer = TextRecognizer();
   final _barcodeScanner = BarcodeScanner();
+  
+  // Audio configuration
   final _audioPlayer = AudioPlayer();
+  final _beepSource = AssetSource('sounds/beep.wav');
   
   Timer? _analysisTimer;
   final Set<String> _beepedData = {};
+  int _lastAnalysisTime = 0;
 
   @override
   void initState() {
     super.initState();
     _initializeCamera();
+    _setupAudio();
     
     _laserController = AnimationController(
       vsync: this,
@@ -52,11 +57,28 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
     _laserAnimation = Tween<double>(begin: 0, end: 1).animate(_laserController);
   }
 
+  Future<void> _setupAudio() async {
+    try {
+      await _audioPlayer.setSource(_beepSource);
+      await _audioPlayer.setPlayerMode(PlayerMode.lowLatency);
+    } catch (e) {
+      debugPrint("Audio Setup Error: $e");
+    }
+  }
+
+  Future<void> _playBeep() async {
+    try {
+      // In version 5.x, play() with a source is more reliable than resume() for repeat triggers
+      await _audioPlayer.play(_beepSource, mode: PlayerMode.lowLatency);
+    } catch (e) {
+      debugPrint("Audio Play Error: $e");
+    }
+  }
+
   Future<void> _initializeCamera() async {
     final cameras = await availableCameras();
     if (cameras.isEmpty) return;
     
-    // Target the main back camera
     CameraDescription? mainCamera;
     for (var c in cameras) {
       if (c.lensDirection == CameraLensDirection.back) {
@@ -68,30 +90,42 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
 
     _controller = CameraController(
       mainCamera, 
-      ResolutionPreset.max,
+      ResolutionPreset.high,
       enableAudio: false,
+      imageFormatGroup: Platform.isAndroid
+          ? ImageFormatGroup.nv21
+          : ImageFormatGroup.bgra8888,
     );
     
     try {
       await _controller!.initialize();
       if (mounted) {
         setState(() {});
-        _startRealtimeAnalysis();
+        _startImageStream();
       }
     } catch (e) {
       debugPrint("Camera Error: $e");
     }
   }
 
-  void _startRealtimeAnalysis() {
-    _analysisTimer = Timer.periodic(const Duration(milliseconds: 1200), (timer) async {
-      if (_isProcessing || _isAnalyzing || _controller == null || !_controller!.value.isInitialized) return;
-      
+  void _startImageStream() {
+    if (_controller == null || !_controller!.value.isInitialized) return;
+
+    _controller!.startImageStream((CameraImage image) async {
+      if (_isProcessing || _isAnalyzing) return;
+
+      final now = DateTime.now().millisecondsSinceEpoch;
+      if (now - _lastAnalysisTime < 1200) return;
+      _lastAnalysisTime = now;
+
       _isAnalyzing = true;
       try {
-        final image = await _controller!.takePicture();
-        final inputImage = InputImage.fromFilePath(image.path);
-        
+        final inputImage = _inputImageFromCameraImage(image);
+        if (inputImage == null) {
+          _isAnalyzing = false;
+          return;
+        }
+
         final results = await Future.wait([
           _barcodeScanner.processImage(inputImage),
           _textRecognizer.processImage(inputImage),
@@ -103,7 +137,6 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
         List<_HighlightBox> boxes = [];
         bool newlyDetected = false;
 
-        // 1. Check Barcodes
         if (barcodes.isNotEmpty) {
            final code = barcodes.first.rawValue ?? "";
            if (!_beepedData.contains(code)) {
@@ -115,7 +148,6 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
            }
         }
 
-        // 2. Check Dates
         final dateRegex = RegExp(r'\b\d{1,2}[./ \-]\d{2,4}\b');
         for (var block in recognizedText.blocks) {
           final blockText = block.text.toLowerCase();
@@ -137,7 +169,7 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
 
         if (mounted && boxes.isNotEmpty) {
           if (newlyDetected) {
-            unawaited(_audioPlayer.play(AssetSource('sounds/beep.mp3')).catchError((_) {}));
+            unawaited(_playBeep());
           }
           setState(() {
             _realtimeHighlights = boxes;
@@ -146,45 +178,61 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
             if (mounted) setState(() => _realtimeHighlights = []);
           });
         }
-        
-        File(image.path).delete().catchError((_) {});
-      } catch (_) {}
+      } catch (e) {
+        debugPrint("Analysis Error: $e");
+      }
       _isAnalyzing = false;
     });
+  }
+
+  InputImage? _inputImageFromCameraImage(CameraImage image) {
+    if (_controller == null) return null;
+    final sensorOrientation = _controller!.description.sensorOrientation;
+    InputImageRotation? rotation = InputImageRotationValue.fromRawValue(sensorOrientation);
+    if (rotation == null) return null;
+    final format = InputImageFormatValue.fromRawValue(image.format.raw);
+    if (format == null) return null;
+    if (image.planes.isEmpty) return null;
+
+    return InputImage.fromBytes(
+      bytes: _concatenatePlanes(image.planes),
+      metadata: InputImageMetadata(
+        size: Size(image.width.toDouble(), image.height.toDouble()),
+        rotation: rotation,
+        format: format,
+        bytesPerRow: image.planes.first.bytesPerRow,
+      ),
+    );
+  }
+
+  Uint8List _concatenatePlanes(List<Plane> planes) {
+    final allBytes = BytesBuilder();
+    for (final plane in planes) {
+      allBytes.add(plane.bytes);
+    }
+    return allBytes.toBytes();
   }
 
   Future<void> _capture() async {
     if (_controller == null || !_controller!.value.isInitialized || _isProcessing) return;
     
-    _analysisTimer?.cancel();
     setState(() => _isProcessing = true);
+    unawaited(_playBeep());
 
     try {
+      await _controller!.stopImageStream().catchError((_) {});
       final image = await _controller!.takePicture();
       _capturedImagePath = image.path;
-      await _audioPlayer.play(AssetSource('sounds/beep.mp3')).catchError((_) {});
-      
       if (mounted) setState(() {});
 
       final inputImage = InputImage.fromFilePath(image.path);
       final recognizedText = await _textRecognizer.processImage(inputImage);
-      
-      if (mounted) {
-        setState(() {
-          _processingBlocks = recognizedText.blocks;
-        });
-      }
+      if (mounted) setState(() { _processingBlocks = recognizedText.blocks; });
 
-      // 1. Show Professional Sweep Animation
       await Future.delayed(const Duration(seconds: 3));
 
-      // 2. Comprehensive Field Analysis
       final barcodes = await _barcodeScanner.processImage(inputImage);
       Product product = TextParser.parse(recognizedText);
-      
-      // 3. APPLY SELF-LEARNING INTELLIGENCE
-      product = LearningService().applyIntelligence(product);
-
       product.barcode = barcodes.isNotEmpty ? barcodes.first.rawValue : null;
       product.productCode = product.barcode ?? product.productCode;
       product.imagePath = image.path;
@@ -196,7 +244,7 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
     } catch (e) {
       if (mounted) {
         setState(() => _isProcessing = false);
-        _startRealtimeAnalysis();
+        _startImageStream();
       }
     }
   }
@@ -217,45 +265,19 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
     if (_controller == null || !_controller!.value.isInitialized) {
       return const Scaffold(backgroundColor: Colors.black, body: Center(child: CircularProgressIndicator(color: Colors.green)));
     }
-
-    final screenWidth = MediaQuery.of(context).size.width;
-    final screenHeight = MediaQuery.of(context).size.height;
-
     return Scaffold(
       backgroundColor: Colors.black,
       body: Stack(
         children: [
           Positioned.fill(child: CameraPreview(_controller!)),
-          
-          // Real-time Visual Circles (mapped based on preview size)
-          ..._realtimeHighlights.map((box) => Positioned(
-            left: box.rect.left * (screenWidth / 1000.0), 
-            top: box.rect.top * (screenHeight / 1000.0),
-            child: Container(
-              width: box.rect.width * (screenWidth / 1000.0), 
-              height: box.rect.height * (screenHeight / 1000.0),
-              decoration: BoxDecoration(
-                border: Border.all(color: box.color, width: 3), 
-                borderRadius: BorderRadius.circular(4),
-              ),
-            ),
-          )),
-
-          // Frame Overlay
-          Container(
-            decoration: const ShapeDecoration(
-              shape: _LegacyScannerOverlay(laserPosition: 0, showLaser: false),
-            ),
-          ),
-
+          ..._realtimeHighlights.map((box) => _MappedHighlight(rect: box.rect, color: box.color)),
+          Container(decoration: const ShapeDecoration(shape: _LegacyScannerOverlay(laserPosition: 0, showLaser: false))),
           if (_isProcessing && _capturedImagePath != null) _buildProcessingUI(),
-
           if (!_isProcessing)
             Positioned(
               top: 50, left: 10,
               child: IconButton(icon: const Icon(Icons.arrow_back, color: Colors.white, size: 35), onPressed: () => Navigator.pop(context)),
             ),
-
           if (!_isProcessing)
             Positioned(
               bottom: 40, left: 0, right: 0,
@@ -282,10 +304,7 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
                     icon: const Icon(Icons.history, color: Colors.white, size: 30),
                     onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const ProductListScreen())),
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.image, color: Colors.white, size: 30),
-                    onPressed: () {}, 
-                  ),
+                  IconButton(icon: const Icon(Icons.image, color: Colors.white, size: 30), onPressed: () {}),
                 ],
               ),
             ),
@@ -306,8 +325,6 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
             children: [
               Positioned.fill(child: Image.file(File(_capturedImagePath!), fit: BoxFit.cover)),
               Container(color: Colors.black45),
-              
-              // Hover and Highlight Animation
               ..._processingBlocks.map((block) {
                 final r = block.boundingBox;
                 final bool isHit = laserY > r.top && laserY < r.bottom + 80;
@@ -318,33 +335,21 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
                     opacity: isHit ? 1.0 : 0.0,
                     child: Container(
                       width: r.width, height: r.height,
-                      decoration: BoxDecoration(
-                        color: Colors.green.withOpacity(0.2), 
-                        border: Border.all(color: Colors.greenAccent, width: 2)
-                      ),
+                      decoration: BoxDecoration(color: Colors.green.withOpacity(0.2), border: Border.all(color: Colors.greenAccent, width: 2)),
                     ),
                   ),
                 );
               }),
-
-              // Laser Scanning Line
               Positioned(
                 top: laserY, left: 0, right: 0,
-                child: Container(
-                  height: 3, 
-                  decoration: BoxDecoration(
-                    color: Colors.greenAccent, 
-                    boxShadow: [BoxShadow(color: Colors.greenAccent, blurRadius: 15, spreadRadius: 2)]
-                  )
-                ),
+                child: Container(height: 3, decoration: BoxDecoration(color: Colors.greenAccent, boxShadow: [BoxShadow(color: Colors.greenAccent, blurRadius: 15, spreadRadius: 2)])),
               ),
-
               const Center(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     CircularProgressIndicator(color: Colors.white, strokeWidth: 4),
-                    SizedBox(height: 35),
+                    SizedBox(height: 30),
                     Text("Please wait the picture is processing...", style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold, decoration: TextDecoration.none)),
                   ],
                 ),
@@ -363,11 +368,30 @@ class _HighlightBox {
   _HighlightBox(this.rect, this.color);
 }
 
+class _MappedHighlight extends StatelessWidget {
+  final Rect rect;
+  final Color color;
+  const _MappedHighlight({required this.rect, required this.color});
+  @override
+  Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+    return Positioned(
+      left: rect.left * (screenWidth / 1000.0) - 5,
+      top: rect.top * (screenHeight / 1000.0) - 5,
+      child: Container(
+        width: rect.width * (screenWidth / 1000.0) + 10,
+        height: rect.height * (screenHeight / 1000.0) + 10,
+        decoration: BoxDecoration(border: Border.all(color: color, width: 3), borderRadius: BorderRadius.circular(10)),
+      ),
+    );
+  }
+}
+
 class _LegacyScannerOverlay extends ShapeBorder {
   final double laserPosition;
   final bool showLaser;
   const _LegacyScannerOverlay({required this.laserPosition, this.showLaser = true});
-
   @override
   EdgeInsetsGeometry get dimensions => EdgeInsets.zero;
   @override

@@ -5,6 +5,7 @@ import 'package:google_mlkit_barcode_scanning/google_mlkit_barcode_scanning.dart
 import 'package:audioplayers/audioplayers.dart';
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 import '../services/text_parser.dart';
 
 class FieldScannerScreen extends StatefulWidget {
@@ -21,7 +22,8 @@ class _FieldScannerScreenState extends State<FieldScannerScreen> with SingleTick
   final _barcodeScanner = BarcodeScanner();
   final _audioPlayer = AudioPlayer();
   bool _isFinished = false;
-  Timer? _autoAnalysisTimer;
+  bool _isAnalyzing = false;
+  int _lastAnalysisTime = 0;
   
   late AnimationController _laserController;
   late Animation<double> _laserAnimation;
@@ -37,7 +39,12 @@ class _FieldScannerScreenState extends State<FieldScannerScreen> with SingleTick
   Future<void> _initializeCamera() async {
     final cameras = await availableCameras();
     if (cameras.isEmpty) return;
-    _controller = CameraController(cameras[0], ResolutionPreset.high, enableAudio: false);
+    _controller = CameraController(
+      cameras[0], 
+      ResolutionPreset.high, 
+      enableAudio: false,
+      imageFormatGroup: Platform.isAndroid ? ImageFormatGroup.nv21 : ImageFormatGroup.bgra8888,
+    );
     
     try {
       await _controller!.initialize();
@@ -51,19 +58,63 @@ class _FieldScannerScreenState extends State<FieldScannerScreen> with SingleTick
   }
 
   void _startAutoAnalysis() {
-    // High-frequency auto-check every 1.0 second for "instant" feel
-    _autoAnalysisTimer = Timer.periodic(const Duration(milliseconds: 1000), (timer) async {
-      if (_isFinished || _controller == null || !_controller!.value.isInitialized) return;
-      _autoDetect();
+    if (_controller == null || !_controller!.value.isInitialized) return;
+
+    _controller!.startImageStream((CameraImage image) async {
+      if (_isFinished || _isAnalyzing) return;
+
+      final now = DateTime.now().millisecondsSinceEpoch;
+      if (now - _lastAnalysisTime < 1000) return;
+      _lastAnalysisTime = now;
+
+      _isAnalyzing = true;
+      try {
+        final inputImage = _inputImageFromCameraImage(image);
+        if (inputImage != null) {
+          await _autoDetect(inputImage);
+        }
+      } catch (e) {
+        debugPrint("Field Analysis Error: $e");
+      }
+      _isAnalyzing = false;
     });
   }
 
-  Future<void> _autoDetect() async {
+  InputImage? _inputImageFromCameraImage(CameraImage image) {
+    if (_controller == null) return null;
+
+    final sensorOrientation = _controller!.description.sensorOrientation;
+    InputImageRotation? rotation = InputImageRotationValue.fromRawValue(sensorOrientation);
+    if (rotation == null) return null;
+
+    final format = InputImageFormatValue.fromRawValue(image.format.raw);
+    if (format == null) return null;
+
+    if (image.planes.isEmpty) return null;
+
+    return InputImage.fromBytes(
+      bytes: _concatenatePlanes(image.planes),
+      metadata: InputImageMetadata(
+        size: Size(image.width.toDouble(), image.height.toDouble()),
+        rotation: rotation,
+        format: format,
+        bytesPerRow: image.planes.first.bytesPerRow,
+      ),
+    );
+  }
+
+  Uint8List _concatenatePlanes(List<Plane> planes) {
+    final allBytes = BytesBuilder();
+    for (final plane in planes) {
+      allBytes.add(plane.bytes);
+    }
+    return allBytes.toBytes();
+  }
+
+  Future<void> _autoDetect(InputImage inputImage) async {
     if (_isFinished) return;
 
     try {
-      final image = await _controller!.takePicture();
-      final inputImage = InputImage.fromFilePath(image.path);
       String? result;
 
       // 1. Logic for Barcode/Product Code
@@ -90,24 +141,19 @@ class _FieldScannerScreenState extends State<FieldScannerScreen> with SingleTick
 
       if (result != null && result.isNotEmpty && !_isFinished) {
         _isFinished = true;
-        _autoAnalysisTimer?.cancel();
         
         // Confirmation Beep
-        await _audioPlayer.play(AssetSource('sounds/beep.mp3')).catchError((_) {});
+        unawaited(_audioPlayer.play(AssetSource('sounds/beep.wav')).catchError((_) {}));
 
         if (mounted) {
           Navigator.pop(context, result);
         }
-      } else {
-        // Clean up immediately to save space/memory
-        File(image.path).delete().catchError((_) {});
       }
     } catch (_) {}
   }
 
   @override
   void dispose() {
-    _autoAnalysisTimer?.cancel();
     _laserController.dispose();
     _controller?.dispose();
     _textRecognizer.close();
