@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
+import 'package:google_mlkit_arabic_text_recognition/google_mlkit_arabic_text_recognition.dart';
 import 'package:google_mlkit_barcode_scanning/google_mlkit_barcode_scanning.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'dart:async';
@@ -33,7 +34,7 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
   late AnimationController _laserController;
   late Animation<double> _laserAnimation;
 
-  final _textRecognizer = TextRecognizer(script: TextRecognitionScript.arabic);
+  final _textRecognizer = ArabicTextRecognizer();
   final _barcodeScanner = BarcodeScanner();
   
   // Audio configuration
