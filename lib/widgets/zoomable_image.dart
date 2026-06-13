@@ -47,7 +47,7 @@ class ZoomableImage extends StatelessWidget {
           tag: imagePath,
           child: Image.file(
             File(imagePath),
-            fit: BoxFit.cover,
+            fit: BoxFit.contain,
             errorBuilder: (context, error, stackTrace) => const Center(
               child: Icon(Icons.image_not_supported, size: 50, color: Colors.grey),
             ),

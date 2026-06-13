@@ -6,6 +6,7 @@ import 'package:audioplayers/audioplayers.dart';
 import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
+import 'dart:ui';
 import '../services/text_parser.dart';
 import '../models/product.dart';
 import 'result_screen.dart';
@@ -32,7 +33,7 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
   late AnimationController _laserController;
   late Animation<double> _laserAnimation;
 
-  final _textRecognizer = TextRecognizer();
+  final _textRecognizer = TextRecognizer(script: TextRecognitionScript.arabic);
   final _barcodeScanner = BarcodeScanner();
   
   // Audio configuration
@@ -225,6 +226,11 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
       _capturedImagePath = image.path;
       if (mounted) setState(() {});
 
+      // Get image dimensions for coordinate normalization
+      final bytes = await File(image.path).readAsBytes();
+      final decoded = await decodeImageFromList(bytes);
+      final imageSize = Size(decoded.width.toDouble(), decoded.height.toDouble());
+
       final inputImage = InputImage.fromFilePath(image.path);
       final recognizedText = await _textRecognizer.processImage(inputImage);
       if (mounted) setState(() { _processingBlocks = recognizedText.blocks; });
@@ -232,7 +238,7 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
       await Future.delayed(const Duration(seconds: 3));
 
       final barcodes = await _barcodeScanner.processImage(inputImage);
-      Product product = TextParser.parse(recognizedText);
+      Product product = TextParser.parse(recognizedText, imageSize: imageSize);
       product.barcode = barcodes.isNotEmpty ? barcodes.first.rawValue : null;
       product.productCode = product.barcode ?? product.productCode;
       product.imagePath = image.path;

@@ -18,7 +18,7 @@ class FieldScannerScreen extends StatefulWidget {
 
 class _FieldScannerScreenState extends State<FieldScannerScreen> with SingleTickerProviderStateMixin {
   CameraController? _controller;
-  final _textRecognizer = TextRecognizer();
+  final _textRecognizer = TextRecognizer(script: TextRecognitionScript.arabic);
   final _barcodeScanner = BarcodeScanner();
   final _audioPlayer = AudioPlayer();
   bool _isFinished = false;

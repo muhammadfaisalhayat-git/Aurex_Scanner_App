@@ -93,7 +93,7 @@ class _ResultScreenState extends State<ResultScreen> {
               imagePath: widget.product.imagePath!, 
               mfgBox: widget.product.mfgBox, 
               expBox: widget.product.expBox,
-              height: 220
+              height: 250
             )
           else
             Container(
