@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'services/database_service.dart';
 import 'services/firebase_service.dart';
@@ -54,7 +55,9 @@ class AurexApp extends StatelessWidget {
       ),
       locale: localeProvider.locale,
       localizationsDelegates: const [
-        // Standard delegates kept for build stability
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
       ],
       supportedLocales: const [
         Locale('en', ''),
