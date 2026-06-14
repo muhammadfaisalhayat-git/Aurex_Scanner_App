@@ -28,7 +28,7 @@ class TextParser {
     "الوزن الصافي عند التعبئة", "الكمية الصافية", "الوزن :", "بذور", "بذرة", "حبة", "السعة الصافية", "الوزن الاجمالي", "جرام", "كجم"
   ];
 
-  static const Map<String, String> _monthMap = {
+  static const Map<String, String> monthMap = {
     'jan': '01', 'feb': '02', 'mar': '03', 'apr': '04', 'may': '05', 'jun': '06',
     'jul': '07', 'aug': '08', 'sep': '09', 'oct': '10', 'nov': '11', 'dec': '12',
     'يناير': '01', 'فبراير': '02', 'مارس': '03', 'ابريل': '04', 'مايو': '05', 'يونيو': '06',
@@ -36,7 +36,7 @@ class TextParser {
   };
 
   // Expanded patterns to catch varied date formats including text months (e.g., Sep.2025)
-  static final List<RegExp> _datePatterns = [
+  static final List<RegExp> datePatterns = [
     RegExp(r'\b\d{1,2}\s*[./ \-]\s*\d{1,2}\s*[./ \-]\s*\d{4}\b'), // DD/MM/YYYY
     RegExp(r'\b\d{1,2}\s*[./ \-]\s*\d{4}\b'),                      // MM/YYYY
     RegExp(r'\b\d{4}\s*[./ \-]\s*\d{1,2}\b'),                      // YYYY/MM
@@ -47,7 +47,7 @@ class TextParser {
     RegExp(r'\b\d{1,2}[. ]?\s*(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[. ]?\s*\d{4}\b', caseSensitive: false),
   ];
 
-  static final RegExp _unitRegex = RegExp(
+  static final RegExp unitRegex = RegExp(
     r'(\d+[,.]?\d*)\s*(kg|g|mg|gr|ks|l|ml|liter|litres|gram|kilogram|kgm|غم|غرام|مل|ملي|ك|كيلو|كيلوجرام|كيلو جرام|جرام|جم|كجم|seeds|بذرة|بذور|pcs|piece|gms)',
     caseSensitive: false,
   );
@@ -75,7 +75,7 @@ class TextParser {
             final int idx = lowerText.indexOf(key.toLowerCase());
             String val = fullText.substring((idx + key.length).toInt()).trim();
             val = val.replaceAll(RegExp(r'^[:\s-]+'), '').split('\n').first.trim();
-            if (val.isNotEmpty && val.length > 2 && !_isMetadataBlock(val.toLowerCase())) {
+            if (val.isNotEmpty && val.length > 2 && !isMetadataBlock(val.toLowerCase())) {
               smartName = val;
               break;
             }
@@ -88,7 +88,7 @@ class TextParser {
         if (lowerText.contains(key.toLowerCase())) {
           final int idx = lowerText.indexOf(key.toLowerCase());
           final afterKey = fullText.substring((idx + key.length).toInt()).trim();
-          final match = _unitRegex.firstMatch(afterKey);
+          final match = unitRegex.firstMatch(afterKey);
           if (match != null) {
             final unit = match.group(2)!.toLowerCase();
             if (["kg", "g", "mg", "gr", "gms", "liter", "gram"].contains(unit)) {
@@ -102,11 +102,11 @@ class TextParser {
 
       // Capture all dates
       for (var line in block.lines) {
-        for (var pattern in _datePatterns) {
+        for (var pattern in datePatterns) {
           for (var match in pattern.allMatches(line.text)) {
             String val = match.group(0)!;
-            val = _normalizeDate(val);
-            if (_isValidAgriculturalDate(val)) {
+            val = normalizeDate(val);
+            if (isValidAgriculturalDate(val)) {
               dateElements.add(_DateElement(val, line));
             }
           }
@@ -142,10 +142,10 @@ class TextParser {
       
       if (bestType == 1 && (foundMfg == null || minDist < 50)) {
         foundMfg = dateElem.value;
-        mfgBox = _formatBox(dateElem.line.boundingBox, imageSize);
+        mfgBox = formatBox(dateElem.line.boundingBox, imageSize);
       } else if (bestType == 2 && (foundExp == null || minDist < 50)) {
         foundExp = dateElem.value;
-        expBox = _formatBox(dateElem.line.boundingBox, imageSize);
+        expBox = formatBox(dateElem.line.boundingBox, imageSize);
       }
     }
 
@@ -154,7 +154,7 @@ class TextParser {
       for (var block in mlText.blocks) {
         final text = block.text;
         if (text.contains("صلاحية") || text.contains("الصلاحية") || text.contains("validity") || text.contains("shelf life")) {
-           final calculated = _calculateExpiryFromText(foundMfg, text);
+           final calculated = calculateExpiryFromText(foundMfg, text);
            if (calculated != null) {
              foundExp = calculated;
              break;
@@ -169,7 +169,7 @@ class TextParser {
       sortedBlocks.sort((a, b) => b.boundingBox.height.compareTo(a.boundingBox.height));
       for (var block in sortedBlocks) {
         final text = block.text.toLowerCase();
-        if (block.boundingBox.height > 18 && !_isMetadataBlock(text)) {
+        if (block.boundingBox.height > 18 && !isMetadataBlock(text)) {
           smartName = block.text.split('\n').first.trim();
           break;
         }
@@ -188,30 +188,25 @@ class TextParser {
     );
   }
 
-  static String _normalizeDate(String date) {
+  static String normalizeDate(String date) {
     String val = date.toLowerCase();
-    
-    // Handle alpha months like Sep.2025 -> 09-2025
-    for (var month in _monthMap.entries) {
+    for (var month in monthMap.entries) {
       if (val.contains(month.key)) {
         val = val.replaceAll(month.key, month.value);
         val = val.replaceAll('.', '-').replaceAll(' ', '-');
-        // If it was just "month YYYY", it might need a separator check
         if (!val.contains('-') && val.length > 2) {
            val = "${val.substring(0,2)}-${val.substring(2)}";
         }
         break;
       }
     }
-
-    if (val.length == 8 && !val.contains(RegExp(r'[./ \-]'))) {
+    if (val.length == 8 && !val.contains(RegExp(r'[./ \-binary]'))) {
        val = "${val.substring(0,2)}/${val.substring(2,4)}/${val.substring(4)}";
     }
-    
     return val;
   }
 
-  static String _formatBox(Rect rect, Size? imageSize) {
+  static String formatBox(Rect rect, Size? imageSize) {
     if (imageSize == null) return "${rect.left},${rect.top},${rect.right},${rect.bottom}";
     double left = (rect.left / imageSize.width) * 1000.0;
     double top = (rect.top / imageSize.height) * 1000.0;
@@ -220,15 +215,16 @@ class TextParser {
     return "$left,$top,$right,$bottom";
   }
 
-  static bool _isMetadataBlock(String text) {
+  static bool isMetadataBlock(String text) {
     final lower = text.toLowerCase();
     return lower.contains("date") || lower.contains("tel:") || lower.contains("/") || 
            lower.contains("percent") || lower.contains("tel") || lower.contains("fax") ||
            lower.contains("email") || lower.contains("www.") || lower.contains("mfg") ||
-           lower.contains("exp") || lower.contains("batch") || lower.contains("lot");
+           lower.contains("exp") || lower.contains("batch") || lower.contains("lot") ||
+           lower.contains("exported");
   }
 
-  static String? _calculateExpiryFromText(String mfgDate, String durationText) {
+  static String? calculateExpiryFromText(String mfgDate, String durationText) {
     int yearsToAdd = 0;
     final text = durationText.toLowerCase();
     if (text.contains("عامان") || text.contains("سنتان") || text.contains("2 عام") || text.contains("2 سنة") || text.contains("two years")) {
@@ -250,7 +246,7 @@ class TextParser {
     } catch (_) { return null; }
   }
 
-  static bool _isValidAgriculturalDate(String date) {
+  static bool isValidAgriculturalDate(String date) {
     final parts = date.split(RegExp(r'[./ \-]\s*')).where((s) => s.isNotEmpty).toList();
     if (parts.length < 2) return false;
     try {

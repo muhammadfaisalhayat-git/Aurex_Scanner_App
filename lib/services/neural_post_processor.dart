@@ -3,25 +3,19 @@ import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart
 import '../models/product.dart';
 import 'text_parser.dart';
 
-/// An on-device Deep Learning inspired post-processor.
-/// Replaces cloud APIs with local semantic and spatial relationship modeling.
 class NeuralPostProcessor {
   static final NeuralPostProcessor _instance = NeuralPostProcessor._internal();
   factory NeuralPostProcessor() => _instance;
   NeuralPostProcessor._internal();
 
-  // Semantic similarity thresholds
-  static const double _minSimilarity = 0.75;
-
-  /// Refines raw OCR results using on-device spatial and semantic logic
   Product refine(RecognizedText rawText, Size imageSize) {
     final blocks = rawText.blocks;
     
     // 1. Identify "Anchors" (Labels like MFG, EXP, Name)
     final anchors = _identifyAnchors(blocks);
     
-    // 2. Identify "Candidates" (Potential values: Dates, Numbers, Text)
-    final candidates = _identifyCandidates(blocks);
+    // 2. Extract potential values with strict validation
+    final List<_ValueCandidate> candidates = _extractValidatedCandidates(rawText);
 
     String? name;
     String? mfgDate;
@@ -46,34 +40,34 @@ class NeuralPostProcessor {
       if (bestMatch != null && bestMatch.score > 0.4) {
         switch (bestMatch.anchor.type) {
           case _AnchorType.mfg:
-            if (mfgDate == null) {
+            if (mfgDate == null && candidate.isDate) {
               mfgDate = candidate.text;
-              mfgBox = _normalizeRect(candidate.boundingBox, imageSize);
+              mfgBox = TextParser.formatBox(candidate.boundingBox, imageSize);
             }
             break;
           case _AnchorType.exp:
-            if (expDate == null) {
+            if (expDate == null && candidate.isDate) {
               expDate = candidate.text;
-              expBox = _normalizeRect(candidate.boundingBox, imageSize);
+              expBox = TextParser.formatBox(candidate.boundingBox, imageSize);
             }
             break;
           case _AnchorType.name:
-            name ??= candidate.text;
+            if (!candidate.isDate && !candidate.isWeight) name ??= candidate.text;
             break;
           case _AnchorType.size:
-            size ??= candidate.text;
+            if (candidate.isWeight) size ??= candidate.text;
             break;
         }
       }
     }
 
-    // 4. Fallback for Product Name (Highest confidence central block)
+    // 4. Fallback for Product Name (Largest clean block)
     if (name == null || name == "Unknown Product") {
        name = _smartNameFallback(blocks);
     }
 
     return Product(
-      productCode: "", // Handled by barcode scanner priority
+      productCode: "", 
       name: name ?? "Unknown Product",
       mfgDate: mfgDate,
       expDate: expDate,
@@ -86,84 +80,106 @@ class NeuralPostProcessor {
   List<_Anchor> _identifyAnchors(List<TextBlock> blocks) {
     final List<_Anchor> anchors = [];
     for (var block in blocks) {
-      final text = block.text.toLowerCase();
-      
-      // Use fuzzy logic to find anchors even if OCR is slightly off
-      if (_containsAny(text, TextParser.mfgKeywords)) {
+      final text = block.text.toLowerCase().trim();
+      if (_isStrictKeywordMatch(text, TextParser.mfgKeywords)) {
         anchors.add(_Anchor(block, _AnchorType.mfg));
-      } else if (_containsAny(text, TextParser.expKeywords)) {
+      } else if (_isStrictKeywordMatch(text, TextParser.expKeywords)) {
         anchors.add(_Anchor(block, _AnchorType.exp));
-      } else if (_containsAny(text, TextParser.nameKeywords)) {
+      } else if (_isStrictKeywordMatch(text, TextParser.nameKeywords)) {
         anchors.add(_Anchor(block, _AnchorType.name));
-      } else if (_containsAny(text, TextParser.sizeKeywords)) {
+      } else if (_isStrictKeywordMatch(text, TextParser.sizeKeywords)) {
         anchors.add(_Anchor(block, _AnchorType.size));
       }
     }
     return anchors;
   }
 
-  List<TextBlock> _identifyCandidates(List<TextBlock> blocks) {
-    // Candidates are blocks that look like values (dates, weights, or names)
-    // and aren't themselves just a lone label
-    return blocks.where((b) {
-      final t = b.text.trim();
-      return t.length > 2 && !_isStrictLabel(t.toLowerCase());
-    }).toList();
+  bool _isStrictKeywordMatch(String text, List<String> keywords) {
+    for (var k in keywords) {
+       final kw = k.toLowerCase();
+       if (kw.length <= 4) {
+          if (text == kw || text == "$kw:" || text == "$kw.") return true;
+       } else {
+          if (text.contains(kw)) return true;
+       }
+    }
+    return false;
   }
 
-  bool _isStrictLabel(String text) {
-    final keywords = [...TextParser.mfgKeywords, ...TextParser.expKeywords, ...TextParser.nameKeywords];
-    return keywords.any((k) => text == k.toLowerCase() || text == "$k:");
+  List<_ValueCandidate> _extractValidatedCandidates(RecognizedText raw) {
+    final List<_ValueCandidate> candidates = [];
+    for (var block in raw.blocks) {
+      for (var line in block.lines) {
+        final text = line.text.trim();
+        if (text.length < 3) continue;
+
+        bool isDate = false;
+        bool isWeight = false;
+        String val = text;
+        
+        // Date Check
+        for (var pattern in TextParser.datePatterns) {
+          if (pattern.hasMatch(text)) {
+            isDate = true;
+            val = pattern.firstMatch(text)!.group(0)!;
+            break;
+          }
+        }
+
+        // Weight Check
+        if (!isDate && TextParser.unitRegex.hasMatch(text)) {
+           isWeight = true;
+        }
+
+        candidates.add(_ValueCandidate(val, line.boundingBox, isDate, isWeight));
+      }
+    }
+    return candidates;
   }
 
-  double _calculateRelationshipScore(_Anchor anchor, TextBlock candidate, Size imgSize) {
+  double _calculateRelationshipScore(_Anchor anchor, _ValueCandidate candidate, Size imgSize) {
     final aRect = anchor.block.boundingBox;
     final cRect = candidate.boundingBox;
 
-    // Vertical Distance (Normalized to image height)
-    final double dy = (cRect.top - aRect.bottom).abs() / imgSize.height;
-    // Horizontal Offset (Alignment)
-    final double dx = (cRect.left - aRect.left).abs() / imgSize.width;
+    final double aCenterY = aRect.top + (aRect.height / 2);
+    final double cCenterY = cRect.top + (cRect.height / 2);
+    final double dy = (aCenterY - cCenterY).abs() / imgSize.height;
     
-    // DL logic: Values usually appear immediately below or to the right of anchors
-    double score = 1.0;
-    
-    // Penalty for being far away
-    score -= dy * 5.0; 
-    score -= dx * 2.0;
+    double score = 0.0;
 
-    // Boost if directly to the right (RTL support handled by absolute distance)
-    if ((cRect.top - aRect.top).abs() < (aRect.height * 0.5)) {
-      score += 0.3; // High horizontal alignment boost
+    // Horizontal Alignment (Same line boost)
+    if ((aCenterY - cCenterY).abs() < aRect.height * 0.9) {
+      if (cRect.left > aRect.left) { // Value on right
+         double dx = (cRect.left - aRect.right).abs() / imgSize.width;
+         score = 1.0 - (dx * 3.0); 
+      } else if (cRect.right < aRect.left) { // Value on left (RTL)
+         double dx = (aRect.left - cRect.right).abs() / imgSize.width;
+         score = 0.9 - (dx * 3.0);
+      }
+    } 
+    // Vertical Alignment (Immediately below boost)
+    else if (cRect.top > aRect.top && (cRect.left - aRect.left).abs() < aRect.width * 0.5) {
+      score = 0.6 - (dy * 5.0);
     }
 
     return score.clamp(0.0, 1.0);
   }
 
-  String _normalizeRect(Rect rect, Size size) {
-    return "${(rect.left/size.width)*1000},${(rect.top/size.height)*1000},${(rect.right/size.width)*1000},${(rect.bottom/size.height)*1000}";
-  }
-
   String? _smartNameFallback(List<TextBlock> blocks) {
     if (blocks.isEmpty) return null;
-    
-    // DL Heuristic: Product name is usually the largest text block 
-    // in the top 40% of the image.
-    final topBlocks = blocks.where((b) => b.boundingBox.top < 400).toList();
+    final topBlocks = blocks.where((b) => b.boundingBox.top < 450).toList();
     if (topBlocks.isEmpty) return null;
     
     topBlocks.sort((a, b) => (b.boundingBox.width * b.boundingBox.height)
         .compareTo(a.boundingBox.width * a.boundingBox.height));
     
-    final best = topBlocks.first;
-    if (best.text.length > 3 && !best.text.contains(RegExp(r'\d'))) {
-      return best.text.split('\n').first;
+    for (var b in topBlocks) {
+       final t = b.text.toLowerCase();
+       if (t.length > 3 && !TextParser.isMetadataBlock(t)) {
+         return b.text.split('\n').first;
+       }
     }
     return null;
-  }
-
-  bool _containsAny(String text, List<String> keywords) {
-    return keywords.any((k) => text.contains(k.toLowerCase()));
   }
 }
 
@@ -173,6 +189,14 @@ class _Anchor {
   final TextBlock block;
   final _AnchorType type;
   _Anchor(this.block, this.type);
+}
+
+class _ValueCandidate {
+  final String text;
+  final Rect boundingBox;
+  final bool isDate;
+  final bool isWeight;
+  _ValueCandidate(this.text, this.boundingBox, this.isDate, this.isWeight);
 }
 
 class _AnchorMatch {
