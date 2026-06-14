@@ -24,45 +24,62 @@ class NeuralPostProcessor {
     String? expBox;
     String? size;
 
-    // 3. Neural-Spatial Pairing: Match each candidate to its most likely anchor
+    // 3. Pairing Logic with high horizontal bias for tables
+    final List<_Pairing> potentialPairs = [];
     for (var candidate in candidates) {
-      _AnchorMatch? bestMatch;
-      double maxScore = 0.0;
-
       for (var anchor in anchors) {
         final score = _calculateRelationshipScore(anchor, candidate, imageSize);
-        if (score > maxScore) {
-          maxScore = score;
-          bestMatch = _AnchorMatch(anchor, score);
-        }
-      }
-
-      if (bestMatch != null && bestMatch.score > 0.4) {
-        switch (bestMatch.anchor.type) {
-          case _AnchorType.mfg:
-            if (mfgDate == null && candidate.isDate) {
-              mfgDate = candidate.text;
-              mfgBox = TextParser.formatBox(candidate.boundingBox, imageSize);
-            }
-            break;
-          case _AnchorType.exp:
-            if (expDate == null && candidate.isDate) {
-              expDate = candidate.text;
-              expBox = TextParser.formatBox(candidate.boundingBox, imageSize);
-            }
-            break;
-          case _AnchorType.name:
-            if (!candidate.isDate && !candidate.isWeight) name ??= candidate.text;
-            break;
-          case _AnchorType.size:
-            if (candidate.isWeight) size ??= candidate.text;
-            break;
+        if (score > 0.2) {
+          potentialPairs.add(_Pairing(anchor, candidate, score));
         }
       }
     }
 
-    // 4. Fallback for Product Name (Largest clean block)
-    if (name == null || name == "Unknown Product") {
+    potentialPairs.sort((a, b) => b.score.compareTo(a.score));
+
+    final Set<String> matchedAnchors = {};
+    final Set<Rect> matchedCandidates = {};
+
+    for (var pair in potentialPairs) {
+      final anchorId = "${pair.anchor.type}_${pair.anchor.block.boundingBox}";
+      final candidateId = pair.candidate.boundingBox;
+
+      if (matchedAnchors.contains(anchorId) || matchedCandidates.contains(candidateId)) {
+        continue;
+      }
+
+      switch (pair.anchor.type) {
+        case _AnchorType.mfg:
+          if (pair.candidate.isDate) {
+            mfgDate = pair.candidate.text;
+            mfgBox = TextParser.formatBox(pair.candidate.boundingBox, imageSize);
+            matchedAnchors.add(anchorId); matchedCandidates.add(candidateId);
+          }
+          break;
+        case _AnchorType.exp:
+          if (pair.candidate.isDate) {
+            expDate = pair.candidate.text;
+            expBox = TextParser.formatBox(pair.candidate.boundingBox, imageSize);
+            matchedAnchors.add(anchorId); matchedCandidates.add(candidateId);
+          }
+          break;
+        case _AnchorType.name:
+          if (!pair.candidate.isDate && !pair.candidate.isWeight) {
+             name = pair.candidate.text;
+             matchedAnchors.add(anchorId); matchedCandidates.add(candidateId);
+          }
+          break;
+        case _AnchorType.size:
+          if (pair.candidate.isWeight) {
+             size = pair.candidate.text;
+             matchedAnchors.add(anchorId); matchedCandidates.add(candidateId);
+          }
+          break;
+      }
+    }
+
+    // 4. Enhanced Fallback for Product Name (Ignore generic labels)
+    if (name == null || name == "Unknown Product" || name == "Variety" || name == "Product" || name == "Kind") {
        name = _smartNameFallback(blocks);
     }
 
@@ -100,6 +117,7 @@ class NeuralPostProcessor {
        if (kw.length <= 4) {
           if (text == kw || text == "$kw:" || text == "$kw.") return true;
        } else {
+          // Flexible contains for multi-word labels like "Expiry Date"
           if (text.contains(kw)) return true;
        }
     }
@@ -122,6 +140,8 @@ class NeuralPostProcessor {
           if (pattern.hasMatch(text)) {
             isDate = true;
             val = pattern.firstMatch(text)!.group(0)!;
+            // Normalize right away to fix Jan/Sep/etc
+            val = TextParser.normalizeDate(val);
             break;
           }
         }
@@ -129,6 +149,14 @@ class NeuralPostProcessor {
         // Weight Check
         if (!isDate && TextParser.unitRegex.hasMatch(text)) {
            isWeight = true;
+        }
+
+        // If the line is STRICTLY a label from our list, don't use it as a value candidate
+        if (!isDate && !isWeight) {
+           if (TextParser.mfgKeywords.contains(text.toLowerCase()) || 
+               TextParser.expKeywords.contains(text.toLowerCase())) {
+             continue; 
+           }
         }
 
         candidates.add(_ValueCandidate(val, line.boundingBox, isDate, isWeight));
@@ -143,23 +171,28 @@ class NeuralPostProcessor {
 
     final double aCenterY = aRect.top + (aRect.height / 2);
     final double cCenterY = cRect.top + (cRect.height / 2);
+    
+    // VERTICAL PROXIMITY: High penalty if on different lines
     final double dy = (aCenterY - cCenterY).abs() / imgSize.height;
     
     double score = 0.0;
 
-    // Horizontal Alignment (Same line boost)
-    if ((aCenterY - cCenterY).abs() < aRect.height * 0.9) {
-      if (cRect.left > aRect.left) { // Value on right
+    // TABLE LAYOUT: Label and Value are usually on the same horizontal plane
+    // Allowing for 120% line height for curvature (cans)
+    if ((aCenterY - cCenterY).abs() < aRect.height * 1.2) {
+      if (cRect.left > aRect.left) { 
+         // Most tables: Label [Left] -> Value [Right]
          double dx = (cRect.left - aRect.right).abs() / imgSize.width;
          score = 1.0 - (dx * 3.0); 
-      } else if (cRect.right < aRect.left) { // Value on left (RTL)
+      } else if (cRect.right < aRect.left) { 
+         // RTL tables: Value [Left] <- Label [Right]
          double dx = (aRect.left - cRect.right).abs() / imgSize.width;
-         score = 0.9 - (dx * 3.0);
+         score = 0.95 - (dx * 3.0);
       }
     } 
-    // Vertical Alignment (Immediately below boost)
-    else if (cRect.top > aRect.top && (cRect.left - aRect.left).abs() < aRect.width * 0.5) {
-      score = 0.6 - (dy * 5.0);
+    // BELOW LAYOUT: Value immediately below label
+    else if (cRect.top > aRect.top && (cRect.left - aRect.left).abs() < aRect.width * 0.8) {
+      score = 0.5 - (dy * 4.0);
     }
 
     return score.clamp(0.0, 1.0);
@@ -167,16 +200,20 @@ class NeuralPostProcessor {
 
   String? _smartNameFallback(List<TextBlock> blocks) {
     if (blocks.isEmpty) return null;
-    final topBlocks = blocks.where((b) => b.boundingBox.top < 450).toList();
-    if (topBlocks.isEmpty) return null;
+    final topBlocks = blocks.where((b) => b.boundingBox.top < 500).toList();
     
+    // Sort by largest area
     topBlocks.sort((a, b) => (b.boundingBox.width * b.boundingBox.height)
         .compareTo(a.boundingBox.width * a.boundingBox.height));
     
     for (var b in topBlocks) {
        final t = b.text.toLowerCase();
+       // Ignore generic labels and brand fragments
        if (t.length > 3 && !TextParser.isMetadataBlock(t)) {
-         return b.text.split('\n').first;
+         final result = b.text.split('\n').first.trim();
+         if (result != "Variety" && result != "Product" && result != "Crop") {
+           return result;
+         }
        }
     }
     return null;
@@ -199,8 +236,9 @@ class _ValueCandidate {
   _ValueCandidate(this.text, this.boundingBox, this.isDate, this.isWeight);
 }
 
-class _AnchorMatch {
+class _Pairing {
   final _Anchor anchor;
+  final _ValueCandidate candidate;
   final double score;
-  _AnchorMatch(this.anchor, this.score);
+  _Pairing(this.anchor, this.candidate, this.score);
 }

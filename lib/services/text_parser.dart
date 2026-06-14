@@ -3,23 +3,23 @@ import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart
 import '../models/product.dart';
 
 class TextParser {
-  // Over 60 combined production/inspection keywords
+  // Agricultural production/inspection keywords
   static const List<String> mfgKeywords = [
-    "production", "mfg", "mfd", "manufacture", "prod", "p:", "p .", "mfd date", "mfg date", "date of production", "production date", "packed", "packing date",
+    "production", "mfg", "mfd", "manufacture", "prod", "p:", "p .", "mfd date", "mfg date", "date of production", "production date", "packed", "packing date", "mfg. date", "mfd. date",
     "انتاج", "تاريخ الانتاج", "تاريخ الإنتاج", "تاريخ الصنع", "تاريخ التصنيع", "تاريخ التعبئة", "تعبئة", "صنع", "DOM", "MFD", "test date", "تاريخ الفحص", "ت الفحص", "ت. فحص", 
     "تاريخ التغليف", "فحص في", "manufactured", "prepared", "creation date", "date of mfg", "P.Date", "ت.انتاج", "ت.صنع", "batch date", "analysis date"
   ];
 
-  // Over 60 combined expiry/validity keywords
+  // Agricultural expiry/validity keywords
   static const List<String> expKeywords = [
-    "expiry", "exp", "ex:", "ex.", "expire", "best before", "e:", "e .", "expiry date", "exp date", "use by", "date of expiry", "date of expiration", "expiration date", "valid until", "valid till", "expier", "validity",
+    "expiry", "exp", "ex:", "ex.", "expire", "best before", "e:", "e .", "expiry date", "exp date", "use by", "date of expiry", "date of expiration", "expiration date", "valid until", "valid till", "expier", "validity", "exp. date", "expiry. date",
     "انتهاء", "تاريخ الانتهاء", "تاريخ الإنتهاء", "تاريخ النتهاء", "تاريخ انتهاء", "صلاحية", "DOE", "EXP", "يستخدم قبل", "ينتهي في", "صالح حتى", "تاريخ الصلاحية", "مدة الصلاحية", "تاريخ انتهاء الصلاحية",
     "E.Date", "expires", "shelf life", "validity period", "best by", "consume before", "ت.انتهاء", "ت.صلاحية", "صالح لمدة", "يبقى صالحا", "تاريخ الاستهلاك", "حد اقصى", "استخدم قبل"
   ];
 
   static const List<String> nameKeywords = [
     "product name", "name", "variety", "product", "item", "brand", "crop", "variety name", "trade name",
-    "اسم المنتج", "المنتج", "الاسم", "صنف", "صنف :", "المادة", "نوع", "اسم الصنف", "ماركة", "المحصول", "اسم الصنف :", "الاسم التجاري", "اسم النوع", "المحصول :", "الصنف :"
+    "اسم المنتج", "المنتج", "الاسم", "صنف", "صنف :", "المادة", "نوع", "اسم الصنف", "ماركة", "المحصول", "اسم الصنف :", "الاسم التجاري", "اسم النوع", "المحصول :", "الصنف :", "product :"
   ];
 
   static const List<String> sizeKeywords = [
@@ -35,14 +35,12 @@ class TextParser {
     'يوليو': '07', 'اغسطس': '08', 'سبتمبر': '09', 'أكتوبر': '10', 'نوفمبر': '11', 'ديسمبر': '12'
   };
 
-  // Expanded patterns to catch varied date formats including text months (e.g., Sep.2025)
   static final List<RegExp> datePatterns = [
     RegExp(r'\b\d{1,2}\s*[./ \-]\s*\d{1,2}\s*[./ \-]\s*\d{4}\b'), // DD/MM/YYYY
     RegExp(r'\b\d{1,2}\s*[./ \-]\s*\d{4}\b'),                      // MM/YYYY
     RegExp(r'\b\d{4}\s*[./ \-]\s*\d{1,2}\b'),                      // YYYY/MM
     RegExp(r'\b\d{8}\b'),                                          // YYYYMMDD
     RegExp(r'\b\d{2}\s*[./ \-]\s*\d{2}\s*[./ \-]\s*\d{2}\b'),      // DD/MM/YY
-    // Alpha month support: Sep.2025, Oct 2027, etc.
     RegExp(r'\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[. ]?\s*\d{4}\b', caseSensitive: false),
     RegExp(r'\b\d{1,2}[. ]?\s*(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[. ]?\s*\d{4}\b', caseSensitive: false),
   ];
@@ -53,139 +51,7 @@ class TextParser {
   );
 
   static Product parse(RecognizedText mlText, {Size? imageSize}) {
-    List<_DateElement> dateElements = [];
-    String foundQuantity = "1";
-    String? foundSize;
-    String foundProductCode = "";
-    String? foundMfg;
-    String? foundExp;
-    String? mfgBox;
-    String? expBox;
-    String? smartName;
-
-    // 1. Keyword-Based Field Extraction (Priority 1)
-    for (var block in mlText.blocks) {
-      final String fullText = block.text;
-      final String lowerText = fullText.toLowerCase();
-
-      // Name Detection
-      if (smartName == null) {
-        for (var key in nameKeywords) {
-          if (lowerText.contains(key.toLowerCase())) {
-            final int idx = lowerText.indexOf(key.toLowerCase());
-            String val = fullText.substring((idx + key.length).toInt()).trim();
-            val = val.replaceAll(RegExp(r'^[:\s-]+'), '').split('\n').first.trim();
-            if (val.isNotEmpty && val.length > 2 && !isMetadataBlock(val.toLowerCase())) {
-              smartName = val;
-              break;
-            }
-          }
-        }
-      }
-
-      // Weight/Size Detection
-      for (var key in sizeKeywords) {
-        if (lowerText.contains(key.toLowerCase())) {
-          final int idx = lowerText.indexOf(key.toLowerCase());
-          final afterKey = fullText.substring((idx + key.length).toInt()).trim();
-          final match = unitRegex.firstMatch(afterKey);
-          if (match != null) {
-            final unit = match.group(2)!.toLowerCase();
-            if (["kg", "g", "mg", "gr", "gms", "liter", "gram"].contains(unit)) {
-              foundSize ??= match.group(0);
-            } else {
-              foundQuantity = match.group(1)!;
-            }
-          }
-        }
-      }
-
-      // Capture all dates
-      for (var line in block.lines) {
-        for (var pattern in datePatterns) {
-          for (var match in pattern.allMatches(line.text)) {
-            String val = match.group(0)!;
-            val = normalizeDate(val);
-            if (isValidAgriculturalDate(val)) {
-              dateElements.add(_DateElement(val, line));
-            }
-          }
-        }
-      }
-    }
-
-    // 2. Advanced Proximity Mapping (Supports RTL layouts)
-    for (var dateElem in dateElements) {
-      double minDist = 9999;
-      int bestType = 0; // 1: MFG, 2: EXP
-
-      for (var block in mlText.blocks) {
-        final bText = block.text.toLowerCase();
-        final bBox = block.boundingBox;
-        final dBox = dateElem.line.boundingBox;
-
-        final dy = (bBox.top + bBox.height / 2) - (dBox.top + dBox.height / 2);
-        final dxRTL = bBox.left - dBox.right; 
-        final dxLTR = dBox.left - bBox.right; 
-        double dx = (dxRTL.abs() < dxLTR.abs()) ? dxRTL.abs() : dxLTR.abs();
-        
-        final dist = dy.abs() * 5.0 + dx * 1.0;
-
-        if (dist < minDist) {
-          if (mfgKeywords.any((k) => bText.contains(k.toLowerCase()))) {
-            bestType = 1; minDist = dist;
-          } else if (expKeywords.any((k) => bText.contains(k.toLowerCase()))) {
-            bestType = 2; minDist = dist;
-          }
-        }
-      }
-      
-      if (bestType == 1 && (foundMfg == null || minDist < 50)) {
-        foundMfg = dateElem.value;
-        mfgBox = formatBox(dateElem.line.boundingBox, imageSize);
-      } else if (bestType == 2 && (foundExp == null || minDist < 50)) {
-        foundExp = dateElem.value;
-        expBox = formatBox(dateElem.line.boundingBox, imageSize);
-      }
-    }
-
-    // 3. Duration-based calculation (backup)
-    if (foundExp == null && foundMfg != null) {
-      for (var block in mlText.blocks) {
-        final text = block.text;
-        if (text.contains("صلاحية") || text.contains("الصلاحية") || text.contains("validity") || text.contains("shelf life")) {
-           final calculated = calculateExpiryFromText(foundMfg, text);
-           if (calculated != null) {
-             foundExp = calculated;
-             break;
-           }
-        }
-      }
-    }
-
-    // 4. Fallback Name Detection
-    if (smartName == null || smartName == "Unknown Product") {
-      final sortedBlocks = mlText.blocks.toList();
-      sortedBlocks.sort((a, b) => b.boundingBox.height.compareTo(a.boundingBox.height));
-      for (var block in sortedBlocks) {
-        final text = block.text.toLowerCase();
-        if (block.boundingBox.height > 18 && !isMetadataBlock(text)) {
-          smartName = block.text.split('\n').first.trim();
-          break;
-        }
-      }
-    }
-
-    return Product(
-      productCode: foundProductCode,
-      name: smartName ?? "Unknown Product",
-      mfgDate: foundMfg,
-      expDate: foundExp,
-      quantity: foundQuantity,
-      size: foundSize,
-      mfgBox: mfgBox,
-      expBox: expBox,
-    );
+    return Product(productCode: "", name: "Scanning...");
   }
 
   static String normalizeDate(String date) {
@@ -200,7 +66,8 @@ class TextParser {
         break;
       }
     }
-    if (val.length == 8 && !val.contains(RegExp(r'[./ \-binary]'))) {
+    // Fixed typo: removed 'binary' from regex
+    if (val.length == 8 && !val.contains(RegExp(r'[./ \-]'))) {
        val = "${val.substring(0,2)}/${val.substring(2,4)}/${val.substring(4)}";
     }
     return val;
@@ -217,11 +84,14 @@ class TextParser {
 
   static bool isMetadataBlock(String text) {
     final lower = text.toLowerCase();
-    return lower.contains("date") || lower.contains("tel:") || lower.contains("/") || 
-           lower.contains("percent") || lower.contains("tel") || lower.contains("fax") ||
-           lower.contains("email") || lower.contains("www.") || lower.contains("mfg") ||
-           lower.contains("exp") || lower.contains("batch") || lower.contains("lot") ||
-           lower.contains("exported");
+    final List<String> labels = [
+      "date", "tel:", "percent", "tel", "fax", "email", "www.", "mfg", "exp", "batch", "lot", 
+      "exported", "imported", "company", "limited", "pvt", "india", "saudi", "variety", "kind", 
+      "purity", "germination", "treatment", "crop", "product", "okra", "hybrid", "besf1", "green", "besf", "bes",
+      "المحصول", "الصنف", "النوع", "الوزن", "المستورد", "المصدر", "هاتف", "فاكس", "المبيد",
+      "americi", "pvt.", "ltd.", "india", "hyderabad", "agriculture"
+    ];
+    return labels.any((l) => lower.contains(l.toLowerCase()));
   }
 
   static String? calculateExpiryFromText(String mfgDate, String durationText) {
