@@ -45,10 +45,17 @@ class _AppDrawerState extends State<AppDrawer> {
                   style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 25),
-                Image.asset(
-                  'assets/logos/bin_awf_logo.png',
-                  height: 110,
-                  errorBuilder: (context, error, stackTrace) => const Icon(Icons.eco, color: Colors.white, size: 80),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Image.asset(
+                    'assets/logos/bin_awf_logo.png',
+                    height: 90,
+                    errorBuilder: (context, error, stackTrace) => const Icon(Icons.eco, color: primaryGreen, size: 60),
+                  ),
                 ),
                 const SizedBox(height: 25),
                 Text(
