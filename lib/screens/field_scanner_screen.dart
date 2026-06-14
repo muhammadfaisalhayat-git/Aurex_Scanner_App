@@ -7,6 +7,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 import '../services/text_parser.dart';
+import '../services/neural_post_processor.dart';
 
 class FieldScannerScreen extends StatefulWidget {
   final String fieldName;
@@ -128,7 +129,8 @@ class _FieldScannerScreenState extends State<FieldScannerScreen> with SingleTick
       // 2. Logic for other fields using OCR
       if (result == null || result.isEmpty) {
         final recognizedText = await _textRecognizer.processImage(inputImage);
-        final parsed = TextParser.parse(recognizedText);
+        final Size imageSize = inputImage.metadata?.size ?? const Size(1080, 1920);
+        final parsed = NeuralPostProcessor().refine(recognizedText, imageSize);
         
         switch (widget.fieldName) {
           case "Product Name": result = (parsed.name != "Unknown Product") ? parsed.name : null; break;

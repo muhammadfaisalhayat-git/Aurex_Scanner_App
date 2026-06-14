@@ -24,12 +24,12 @@ class NeuralPostProcessor {
     String? expBox;
     String? size;
 
-    // 3. Pairing Logic with high horizontal bias and "Same-Line" boost
+    // 3. Pairing Logic with High-Precision Spatial Weights
     final List<_Pairing> potentialPairs = [];
     for (var candidate in candidates) {
       for (var anchor in anchors) {
         final score = _calculateRelationshipScore(anchor, candidate, imageSize);
-        if (score > 0.2) {
+        if (score > 0.18) { // Lowered slightly to capture multi-row columnar matches
           potentialPairs.add(_Pairing(anchor, candidate, score));
         }
       }
@@ -42,7 +42,6 @@ class NeuralPostProcessor {
     final Set<Rect> matchedCandidates = {};
 
     for (var pair in potentialPairs) {
-      // Use block center as part of key for uniqueness
       final anchorId = "${pair.anchor.type}_${pair.anchor.block.boundingBox.center}";
       final candidateId = pair.candidate.boundingBox;
 
@@ -97,8 +96,8 @@ class NeuralPostProcessor {
   }
 
   bool _isGenericLabel(String text) {
-    final lower = text.toLowerCase();
-    return ["variety", "product", "kind", "crop", "item", "exported", "india"].any((l) => lower == l);
+    final lower = text.toLowerCase().trim();
+    return ["variety", "product", "kind", "crop", "item", "exported", "india", "lot", "treatment"].any((l) => lower.contains(l));
   }
 
   List<_Anchor> _identifyAnchors(List<TextBlock> blocks) {
@@ -121,8 +120,12 @@ class NeuralPostProcessor {
   bool _isStrictKeywordMatch(String text, List<String> keywords) {
     for (var k in keywords) {
        final kw = k.toLowerCase();
-       // Robust word-boundary check
-       if (text == kw || text.startsWith("$kw ") || text.startsWith("$kw:") || text.contains(" $kw")) {
+       // Multi-word exact or prefix match
+       if (text == kw || text.startsWith("$kw ") || text.startsWith("$kw:") || text.startsWith("$kw.")) {
+         return true;
+       }
+       // Inside multi-line block check
+       if (text.contains("\n$kw") || text.contains("$kw\n")) {
          return true;
        }
     }
@@ -140,7 +143,6 @@ class NeuralPostProcessor {
         bool isWeight = false;
         String val = text;
         
-        // Date Check
         for (var pattern in TextParser.datePatterns) {
           if (pattern.hasMatch(text)) {
             isDate = true;
@@ -150,7 +152,6 @@ class NeuralPostProcessor {
           }
         }
 
-        // Weight Check
         if (!isDate && TextParser.unitRegex.hasMatch(text)) {
            isWeight = true;
         }
@@ -164,42 +165,45 @@ class NeuralPostProcessor {
   double _calculateRelationshipScore(_Anchor anchor, _ValueCandidate candidate, Size imgSize) {
     final aRect = anchor.block.boundingBox;
     final cRect = candidate.boundingBox;
-    final aText = anchor.block.text.toLowerCase();
     final cLineText = candidate.fullLineText.toLowerCase();
 
+    final double aCenterX = aRect.left + (aRect.width / 2);
+    final double cCenterX = cRect.left + (cRect.width / 2);
     final double aCenterY = aRect.top + (aRect.height / 2);
     final double cCenterY = cRect.top + (cRect.height / 2);
-    final double dy = (aCenterY - cCenterY).abs() / imgSize.height;
     
-    double score = 0.0;
-
-    // RULE 1: SELF-CONTAINMENT (ULTRA HIGH BOOST)
-    // If the candidate's line text already contains the anchor's keywords, it's a direct hit!
+    final double dxNorm = (aCenterX - cCenterX).abs() / imgSize.width;
+    final double dyNorm = (aCenterY - cCenterY).abs() / imgSize.height;
+    
+    // RULE 1: SELF-CONTAINMENT (Direct Line Match)
     if (candidate.isDate) {
-      if (anchor.type == _AnchorType.mfg && _isStrictKeywordMatch(cLineText, TextParser.mfgKeywords)) {
-        return 0.99; // Strongest possible match
-      }
-      if (anchor.type == _AnchorType.exp && _isStrictKeywordMatch(cLineText, TextParser.expKeywords)) {
-        return 0.99;
-      }
+      if (anchor.type == _AnchorType.mfg && _isStrictKeywordMatch(cLineText, TextParser.mfgKeywords)) return 0.99;
+      if (anchor.type == _AnchorType.exp && _isStrictKeywordMatch(cLineText, TextParser.expKeywords)) return 0.99;
     }
 
-    // RULE 2: TABLE LAYOUT (Horizontal proximity)
+    // RULE 2: COLUMNAR TABLE MATCH (Anchor on TOP, Value BELOW)
+    // Common in industrial labels (headers on red background)
+    if (cRect.top > aRect.top) {
+       // Check if centers are horizontally aligned (within 15% of width)
+       if ((aCenterX - cCenterX).abs() < aRect.width * 0.4) {
+          // If perfectly vertically stacked, give high score
+          double columnarScore = 0.8 - (dyNorm * 3.0);
+          // Boost if centers are very close
+          if ((aCenterX - cCenterX).abs() < aRect.width * 0.1) columnarScore += 0.15;
+          return columnarScore.clamp(0.0, 1.0);
+       }
+    }
+
+    // RULE 3: HORIZONTAL TABLE MATCH (Label on LEFT, Value on RIGHT)
     if ((aCenterY - cCenterY).abs() < aRect.height * 1.2) {
       if (cRect.left > aRect.left) { 
-         double dx = (cRect.left - aRect.right).abs() / imgSize.width;
-         score = 1.0 - (dx * 3.0); 
+         return (1.0 - (dxNorm * 2.5)).clamp(0.0, 1.0); 
       } else if (cRect.right < aRect.left) { 
-         double dx = (aRect.left - cRect.right).abs() / imgSize.width;
-         score = 0.95 - (dx * 3.0);
+         return (0.95 - (dxNorm * 2.5)).clamp(0.0, 1.0);
       }
     } 
-    // RULE 3: BELOW LAYOUT (Vertical proximity)
-    else if (cRect.top > aRect.top && (cRect.left - aRect.left).abs() < aRect.width * 0.8) {
-      score = 0.5 - (dy * 4.0);
-    }
 
-    return score.clamp(0.0, 1.0);
+    return 0.0;
   }
 
   String? _smartNameFallback(List<TextBlock> blocks) {
