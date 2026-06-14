@@ -28,13 +28,23 @@ class TextParser {
     "الوزن الصافي عند التعبئة", "الكمية الصافية", "الوزن :", "بذور", "بذرة", "حبة", "السعة الصافية", "الوزن الاجمالي", "جرام", "كجم"
   ];
 
-  // Expanded patterns to catch partial or poorly recognized dates
+  static const Map<String, String> _monthMap = {
+    'jan': '01', 'feb': '02', 'mar': '03', 'apr': '04', 'may': '05', 'jun': '06',
+    'jul': '07', 'aug': '08', 'sep': '09', 'oct': '10', 'nov': '11', 'dec': '12',
+    'يناير': '01', 'فبراير': '02', 'مارس': '03', 'ابريل': '04', 'مايو': '05', 'يونيو': '06',
+    'يوليو': '07', 'اغسطس': '08', 'سبتمبر': '09', 'أكتوبر': '10', 'نوفمبر': '11', 'ديسمبر': '12'
+  };
+
+  // Expanded patterns to catch varied date formats including text months (e.g., Sep.2025)
   static final List<RegExp> _datePatterns = [
-    RegExp(r'\b\d{1,2}\s*[./ \-]\s*\d{1,2}\s*[./ \-]\s*\d{4}\b'), // DD/MM/YYYY or MM/DD/YYYY
+    RegExp(r'\b\d{1,2}\s*[./ \-]\s*\d{1,2}\s*[./ \-]\s*\d{4}\b'), // DD/MM/YYYY
     RegExp(r'\b\d{1,2}\s*[./ \-]\s*\d{4}\b'),                      // MM/YYYY
     RegExp(r'\b\d{4}\s*[./ \-]\s*\d{1,2}\b'),                      // YYYY/MM
-    RegExp(r'\b\d{8}\b'),                                          // YYYYMMDD or DDMMYYYY
+    RegExp(r'\b\d{8}\b'),                                          // YYYYMMDD
     RegExp(r'\b\d{2}\s*[./ \-]\s*\d{2}\s*[./ \-]\s*\d{2}\b'),      // DD/MM/YY
+    // Alpha month support: Sep.2025, Oct 2027, etc.
+    RegExp(r'\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[. ]?\s*\d{4}\b', caseSensitive: false),
+    RegExp(r'\b\d{1,2}[. ]?\s*(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[. ]?\s*\d{4}\b', caseSensitive: false),
   ];
 
   static final RegExp _unitRegex = RegExp(
@@ -65,7 +75,7 @@ class TextParser {
             final int idx = lowerText.indexOf(key.toLowerCase());
             String val = fullText.substring(idx + key.length).trim();
             val = val.replaceAll(RegExp(r'^[:\s-]+'), '').split('\n').first.trim();
-            if (val.isNotEmpty && val.length > 2) {
+            if (val.isNotEmpty && val.length > 2 && !_isMetadataBlock(val.toLowerCase())) {
               smartName = val;
               break;
             }
@@ -95,9 +105,7 @@ class TextParser {
         for (var pattern in _datePatterns) {
           for (var match in pattern.allMatches(line.text)) {
             String val = match.group(0)!;
-            if (val.length == 8 && !val.contains(RegExp(r'[./ \-]'))) {
-               val = "${val.substring(0,2)}/${val.substring(2,4)}/${val.substring(4)}";
-            }
+            val = _normalizeDate(val);
             if (_isValidAgriculturalDate(val)) {
               dateElements.add(_DateElement(val, line));
             }
@@ -116,18 +124,11 @@ class TextParser {
         final bBox = block.boundingBox;
         final dBox = dateElem.line.boundingBox;
 
-        // Calculate distances
         final dy = (bBox.top + bBox.height / 2) - (dBox.top + dBox.height / 2);
-        
-        // In Arabic labels, the label is often to the RIGHT of the value.
-        // Label.left - Value.right should be small and positive.
-        // Or if they are on the same line, dy is small.
-        final dxRTL = bBox.left - dBox.right; // Label is on the right
-        final dxLTR = dBox.left - bBox.right; // Label is on the left
-        
+        final dxRTL = bBox.left - dBox.right; 
+        final dxLTR = dBox.left - bBox.right; 
         double dx = (dxRTL.abs() < dxLTR.abs()) ? dxRTL.abs() : dxLTR.abs();
         
-        // Proximity score: heavy weight on Y-alignment, then X-distance
         final dist = dy.abs() * 5.0 + dx * 1.0;
 
         if (dist < minDist) {
@@ -187,6 +188,29 @@ class TextParser {
     );
   }
 
+  static String _normalizeDate(String date) {
+    String val = date.toLowerCase();
+    
+    // Handle alpha months like Sep.2025 -> 09-2025
+    for (var month in _monthMap.entries) {
+      if (val.contains(month.key)) {
+        val = val.replaceAll(month.key, month.value);
+        val = val.replaceAll('.', '-').replaceAll(' ', '-');
+        // If it was just "month YYYY", it might need a separator check
+        if (!val.contains('-') && val.length > 2) {
+           val = "${val.substring(0,2)}-${val.substring(2)}";
+        }
+        break;
+      }
+    }
+
+    if (val.length == 8 && !val.contains(RegExp(r'[./ \-]'))) {
+       val = "${val.substring(0,2)}/${val.substring(2,4)}/${val.substring(4)}";
+    }
+    
+    return val;
+  }
+
   static String _formatBox(Rect rect, Size? imageSize) {
     if (imageSize == null) return "${rect.left},${rect.top},${rect.right},${rect.bottom}";
     double left = (rect.left / imageSize.width) * 1000.0;
@@ -197,9 +221,11 @@ class TextParser {
   }
 
   static bool _isMetadataBlock(String text) {
-    return text.contains("date") || text.contains("tel:") || text.contains("/") || 
-           text.contains("percent") || text.contains("tel") || text.contains("fax") ||
-           text.contains("email") || text.contains("www.");
+    final lower = text.toLowerCase();
+    return lower.contains("date") || lower.contains("tel:") || lower.contains("/") || 
+           lower.contains("percent") || lower.contains("tel") || lower.contains("fax") ||
+           lower.contains("email") || lower.contains("www.") || lower.contains("mfg") ||
+           lower.contains("exp") || lower.contains("batch") || lower.contains("lot");
   }
 
   static String? _calculateExpiryFromText(String mfgDate, String durationText) {
@@ -230,7 +256,6 @@ class TextParser {
     try {
       int m = int.parse(parts[0]);
       int y = int.parse(parts.last);
-      // Agricultural products can have long shelf lives, 2010-2050 is safe
       return (m >= 1 && m <= 12) && ((y >= 10 && y <= 50) || (y >= 2010 && y <= 2050));
     } catch (_) { return false; }
   }

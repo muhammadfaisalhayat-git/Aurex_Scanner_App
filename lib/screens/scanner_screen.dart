@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as p;
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:google_mlkit_barcode_scanning/google_mlkit_barcode_scanning.dart';
 import 'package:audioplayers/audioplayers.dart';
@@ -222,16 +224,26 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
 
     try {
       await _controller!.stopImageStream().catchError((_) {});
-      final image = await _controller!.takePicture();
-      _capturedImagePath = image.path;
+      final XFile rawImage = await _controller!.takePicture();
+      
+      // Move to permanent storage immediately
+      final directory = await getApplicationDocumentsDirectory();
+      final String imagesPath = p.join(directory.path, 'product_images');
+      final dir = Directory(imagesPath);
+      if (!await dir.exists()) await dir.create(recursive: true);
+      
+      final String permanentPath = p.join(imagesPath, "scan_${DateTime.now().millisecondsSinceEpoch}.jpg");
+      final File imageFile = await File(rawImage.path).copy(permanentPath);
+      _capturedImagePath = imageFile.path;
+      
       if (mounted) setState(() {});
 
       // Get image dimensions for coordinate normalization
-      final bytes = await File(image.path).readAsBytes();
+      final bytes = await imageFile.readAsBytes();
       final decoded = await decodeImageFromList(bytes);
       final imageSize = Size(decoded.width.toDouble(), decoded.height.toDouble());
 
-      final inputImage = InputImage.fromFilePath(image.path);
+      final inputImage = InputImage.fromFilePath(imageFile.path);
       final recognizedText = await _textRecognizer.processImage(inputImage);
       if (mounted) setState(() { _processingBlocks = recognizedText.blocks; });
 
@@ -241,7 +253,10 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
       Product product = TextParser.parse(recognizedText, imageSize: imageSize);
       product.barcode = barcodes.isNotEmpty ? barcodes.first.rawValue : null;
       product.productCode = product.barcode ?? product.productCode;
-      product.imagePath = image.path;
+      product.imagePath = imageFile.path;
+
+      // Cleanup raw temp image
+      File(rawImage.path).delete().catchError((_) {});
 
       if (mounted) {
         setState(() => _isProcessing = false);

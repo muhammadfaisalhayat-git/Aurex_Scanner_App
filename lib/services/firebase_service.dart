@@ -26,26 +26,40 @@ class FirebaseService {
     return _storage.ref().child("users/${user.uid}/images");
   }
 
+  /// Ensures the permanent product_images directory exists
+  Future<String> _getImagesDirectory() async {
+    final directory = await getApplicationDocumentsDirectory();
+    final String path = p.join(directory.path, 'product_images');
+    final dir = Directory(path);
+    if (!await dir.exists()) {
+      await dir.create(recursive: true);
+    }
+    return path;
+  }
+
   Future<void> backupAll(List<Product> products, {Function(int current, int total)? onProgress}) async {
     final int total = products.length;
     int count = 0;
     Map<String, dynamic> updates = {};
 
-    // Process in small batches to avoid UI freeze and connection issues
     for (int i = 0; i < products.length; i++) {
       final product = products[i];
       String key = product.productCode.replaceAll(RegExp(r'[.#$\[\]/]'), '_');
       if (key.isEmpty) key = "ID_${product.id}";
       
-      if (product.imagePath != null && File(product.imagePath!).existsSync()) {
-        try {
-          final File imageFile = File(product.imagePath!);
-          final String fileName = "$key.jpg";
-          // Use putFile with a timeout
-          await _storageRef.child(fileName).putFile(imageFile).timeout(const Duration(seconds: 15));
-          debugPrint("Backup: Uploaded $fileName");
-        } catch (e) {
-          debugPrint("Backup: Storage upload error for $key: $e");
+      // Attempt to upload image if it exists locally
+      if (product.imagePath != null) {
+        final File imageFile = File(product.imagePath!);
+        if (imageFile.existsSync()) {
+          try {
+            final String fileName = "$key.jpg";
+            await _storageRef.child(fileName).putFile(imageFile).timeout(const Duration(seconds: 20));
+            debugPrint("Backup: Uploaded $fileName");
+          } catch (e) {
+            debugPrint("Backup: Storage upload failed for $key: $e");
+          }
+        } else {
+          debugPrint("Backup: Image file not found locally at ${product.imagePath}");
         }
       }
 
@@ -62,17 +76,11 @@ class FirebaseService {
   }
 
   Future<int?> restoreAll({Function(int current, int total)? onProgress}) async {
-    final snapshot = await _productRef.get().timeout(const Duration(seconds: 10));
+    final snapshot = await _productRef.get().timeout(const Duration(seconds: 15));
     if (!snapshot.exists || snapshot.value == null) return null;
 
     final dbService = DatabaseService();
-    final directory = await getApplicationDocumentsDirectory();
-    final String imagesPath = p.join(directory.path, 'product_images');
-    
-    final imagesDir = Directory(imagesPath);
-    if (!await imagesDir.exists()) {
-      await imagesDir.create(recursive: true);
-    }
+    final String imagesPath = await _getImagesDirectory();
 
     Map<dynamic, dynamic> rawData = {};
     if (snapshot.value is Map) {
@@ -88,7 +96,8 @@ class FirebaseService {
     int processedCount = 0;
     List<Product> restoredProducts = [];
 
-    // Process entries one by one but with robust timeouts to prevent hanging the whole process
+    debugPrint("Restore: Starting for $total products...");
+
     for (var entry in rawData.entries) {
       try {
         final productData = Map<dynamic, dynamic>.from(entry.value as Map);
@@ -96,28 +105,35 @@ class FirebaseService {
         final String localImagePath = p.join(imagesPath, "$entryKey.jpg");
         final File localFile = File(localImagePath);
 
-        productData['imagePath'] = null; // Default
+        // Crucial: Standardize image path for this device
+        productData['imagePath'] = null; 
 
         try {
           final ref = _storageRef.child("$entryKey.jpg");
           
           if (localFile.existsSync() && localFile.lengthSync() > 0) {
             productData['imagePath'] = localImagePath;
-            debugPrint("Restore: Image already exists for $entryKey");
+            debugPrint("Restore: Image already cached for $entryKey");
           } else {
-            // Attempt to download data
+            // Check if exists on server using download URL as validation
             try {
-              // Using getData is often more reliable than writeToFile for preventing hangs
-              final Uint8List? data = await ref.getData(10 * 1024 * 1024) // 10MB max
-                  .timeout(const Duration(seconds: 8)); 
-              
-              if (data != null) {
-                await localFile.writeAsBytes(data);
-                productData['imagePath'] = localImagePath;
-                debugPrint("Restore: Downloaded image for $entryKey");
+              final String url = await ref.getDownloadURL().timeout(const Duration(seconds: 5));
+              if (url.isNotEmpty) {
+                final Uint8List? data = await ref.getData(10 * 1024 * 1024).timeout(const Duration(seconds: 15)); 
+                if (data != null) {
+                  await localFile.writeAsBytes(data);
+                  productData['imagePath'] = localImagePath;
+                  debugPrint("Restore: Downloaded image for $entryKey");
+                }
+              }
+            } on FirebaseException catch (e) {
+              if (e.code == 'object-not-found') {
+                debugPrint("Restore: Image $entryKey.jpg does not exist on server Storage.");
+              } else {
+                debugPrint("Restore: Storage error for $entryKey: $e");
               }
             } catch (e) {
-              debugPrint("Restore: Image download skipped/failed for $entryKey: $e");
+              debugPrint("Restore: Non-firebase error for $entryKey: $e");
             }
           }
         } catch (e) {
@@ -127,7 +143,7 @@ class FirebaseService {
         productData['id'] = null; 
         restoredProducts.add(Product.fromMap(productData));
       } catch (e) {
-        debugPrint("Restore: Fatal error parsing entry $entry: $e");
+        debugPrint("Restore: Error parsing product: $e");
       } finally {
         processedCount++;
         if (onProgress != null) onProgress(processedCount, total);
@@ -137,7 +153,7 @@ class FirebaseService {
     if (restoredProducts.isNotEmpty) {
       await dbService.deleteAll();
       await dbService.batchInsertProducts(restoredProducts);
-      debugPrint("Restore Complete: ${restoredProducts.length} products saved to local DB.");
+      debugPrint("Restore Complete: ${restoredProducts.length} products saved.");
     }
     
     return restoredProducts.length;
