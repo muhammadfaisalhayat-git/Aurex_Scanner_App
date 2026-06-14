@@ -70,10 +70,10 @@ class TextParser {
 
       // Name Detection
       if (smartName == null) {
-        for (var key in _nameKeywords) {
+        for (var key in nameKeywords) {
           if (lowerText.contains(key.toLowerCase())) {
             final int idx = lowerText.indexOf(key.toLowerCase());
-            String val = fullText.substring(idx + key.length).trim();
+            String val = fullText.substring((idx + key.length).toInt()).trim();
             val = val.replaceAll(RegExp(r'^[:\s-]+'), '').split('\n').first.trim();
             if (val.isNotEmpty && val.length > 2 && !_isMetadataBlock(val.toLowerCase())) {
               smartName = val;
@@ -84,10 +84,10 @@ class TextParser {
       }
 
       // Weight/Size Detection
-      for (var key in _sizeKeywords) {
+      for (var key in sizeKeywords) {
         if (lowerText.contains(key.toLowerCase())) {
           final int idx = lowerText.indexOf(key.toLowerCase());
-          final afterKey = fullText.substring(idx + key.length).trim();
+          final afterKey = fullText.substring((idx + key.length).toInt()).trim();
           final match = _unitRegex.firstMatch(afterKey);
           if (match != null) {
             final unit = match.group(2)!.toLowerCase();
@@ -132,9 +132,9 @@ class TextParser {
         final dist = dy.abs() * 5.0 + dx * 1.0;
 
         if (dist < minDist) {
-          if (_mfgKeywords.any((k) => bText.contains(k.toLowerCase()))) {
+          if (mfgKeywords.any((k) => bText.contains(k.toLowerCase()))) {
             bestType = 1; minDist = dist;
-          } else if (_expKeywords.any((k) => bText.contains(k.toLowerCase()))) {
+          } else if (expKeywords.any((k) => bText.contains(k.toLowerCase()))) {
             bestType = 2; minDist = dist;
           }
         }
