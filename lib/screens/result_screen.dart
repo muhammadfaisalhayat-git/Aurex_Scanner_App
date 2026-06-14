@@ -57,6 +57,7 @@ class _ResultScreenState extends State<ResultScreen> {
 
     try {
       // 1. Core Logic: Self-Learning from this entry
+      await LearningService().learnLayout(p);
       await LearningService().learnFromCorrection(p);
 
       // 2. Persist to Database & Cloud

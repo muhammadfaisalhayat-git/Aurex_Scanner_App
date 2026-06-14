@@ -11,6 +11,8 @@ import 'dart:typed_data';
 import 'dart:ui';
 import '../services/text_parser.dart';
 import '../models/product.dart';
+import '../services/neural_post_processor.dart';
+import '../services/learning_service.dart';
 import 'result_screen.dart';
 import 'product_list_screen.dart';
 
@@ -250,7 +252,14 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
       await Future.delayed(const Duration(seconds: 3));
 
       final barcodes = await _barcodeScanner.processImage(inputImage);
-      Product product = TextParser.parse(recognizedText, imageSize: imageSize);
+      
+      // DEEP LEARNING STAGE: On-Device Neural Post-Processing
+      // Replaces cloud APIs with local spatial & semantic relationship modeling
+      Product product = NeuralPostProcessor().refine(recognizedText, imageSize);
+      
+      // Apply category-specific learned layout weights
+      product = LearningService().applySpatialIntelligence(product, recognizedText.blocks);
+
       product.barcode = barcodes.isNotEmpty ? barcodes.first.rawValue : null;
       product.productCode = product.barcode ?? product.productCode;
       product.imagePath = imageFile.path;
