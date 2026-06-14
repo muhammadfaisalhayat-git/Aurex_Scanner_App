@@ -24,7 +24,7 @@ class NeuralPostProcessor {
     String? expBox;
     String? size;
 
-    // 3. Pairing Logic with high horizontal bias for tables
+    // 3. Pairing Logic with high horizontal bias and "Same-Line" boost
     final List<_Pairing> potentialPairs = [];
     for (var candidate in candidates) {
       for (var anchor in anchors) {
@@ -35,13 +35,15 @@ class NeuralPostProcessor {
       }
     }
 
+    // Sort by descending score to pick absolute best matches first
     potentialPairs.sort((a, b) => b.score.compareTo(a.score));
 
     final Set<String> matchedAnchors = {};
     final Set<Rect> matchedCandidates = {};
 
     for (var pair in potentialPairs) {
-      final anchorId = "${pair.anchor.type}_${pair.anchor.block.boundingBox}";
+      // Use block center as part of key for uniqueness
+      final anchorId = "${pair.anchor.type}_${pair.anchor.block.boundingBox.center}";
       final candidateId = pair.candidate.boundingBox;
 
       if (matchedAnchors.contains(anchorId) || matchedCandidates.contains(candidateId)) {
@@ -78,8 +80,8 @@ class NeuralPostProcessor {
       }
     }
 
-    // 4. Enhanced Fallback for Product Name (Ignore generic labels)
-    if (name == null || name == "Unknown Product" || name == "Variety" || name == "Product" || name == "Kind") {
+    // 4. Enhanced Fallback for Product Name
+    if (name == null || name == "Unknown Product" || _isGenericLabel(name)) {
        name = _smartNameFallback(blocks);
     }
 
@@ -92,6 +94,11 @@ class NeuralPostProcessor {
       expBox: expBox,
       size: size,
     );
+  }
+
+  bool _isGenericLabel(String text) {
+    final lower = text.toLowerCase();
+    return ["variety", "product", "kind", "crop", "item", "exported", "india"].any((l) => lower == l);
   }
 
   List<_Anchor> _identifyAnchors(List<TextBlock> blocks) {
@@ -114,11 +121,9 @@ class NeuralPostProcessor {
   bool _isStrictKeywordMatch(String text, List<String> keywords) {
     for (var k in keywords) {
        final kw = k.toLowerCase();
-       if (kw.length <= 4) {
-          if (text == kw || text == "$kw:" || text == "$kw.") return true;
-       } else {
-          // Flexible contains for multi-word labels like "Expiry Date"
-          if (text.contains(kw)) return true;
+       // Robust word-boundary check
+       if (text == kw || text.startsWith("$kw ") || text.startsWith("$kw:") || text.contains(" $kw")) {
+         return true;
        }
     }
     return false;
@@ -140,7 +145,6 @@ class NeuralPostProcessor {
           if (pattern.hasMatch(text)) {
             isDate = true;
             val = pattern.firstMatch(text)!.group(0)!;
-            // Normalize right away to fix Jan/Sep/etc
             val = TextParser.normalizeDate(val);
             break;
           }
@@ -151,15 +155,7 @@ class NeuralPostProcessor {
            isWeight = true;
         }
 
-        // If the line is STRICTLY a label from our list, don't use it as a value candidate
-        if (!isDate && !isWeight) {
-           if (TextParser.mfgKeywords.contains(text.toLowerCase()) || 
-               TextParser.expKeywords.contains(text.toLowerCase())) {
-             continue; 
-           }
-        }
-
-        candidates.add(_ValueCandidate(val, line.boundingBox, isDate, isWeight));
+        candidates.add(_ValueCandidate(val, line.boundingBox, line.text, isDate, isWeight));
       }
     }
     return candidates;
@@ -168,29 +164,37 @@ class NeuralPostProcessor {
   double _calculateRelationshipScore(_Anchor anchor, _ValueCandidate candidate, Size imgSize) {
     final aRect = anchor.block.boundingBox;
     final cRect = candidate.boundingBox;
+    final aText = anchor.block.text.toLowerCase();
+    final cLineText = candidate.fullLineText.toLowerCase();
 
     final double aCenterY = aRect.top + (aRect.height / 2);
     final double cCenterY = cRect.top + (cRect.height / 2);
-    
-    // VERTICAL PROXIMITY: High penalty if on different lines
     final double dy = (aCenterY - cCenterY).abs() / imgSize.height;
     
     double score = 0.0;
 
-    // TABLE LAYOUT: Label and Value are usually on the same horizontal plane
-    // Allowing for 120% line height for curvature (cans)
+    // RULE 1: SELF-CONTAINMENT (ULTRA HIGH BOOST)
+    // If the candidate's line text already contains the anchor's keywords, it's a direct hit!
+    if (candidate.isDate) {
+      if (anchor.type == _AnchorType.mfg && _isStrictKeywordMatch(cLineText, TextParser.mfgKeywords)) {
+        return 0.99; // Strongest possible match
+      }
+      if (anchor.type == _AnchorType.exp && _isStrictKeywordMatch(cLineText, TextParser.expKeywords)) {
+        return 0.99;
+      }
+    }
+
+    // RULE 2: TABLE LAYOUT (Horizontal proximity)
     if ((aCenterY - cCenterY).abs() < aRect.height * 1.2) {
       if (cRect.left > aRect.left) { 
-         // Most tables: Label [Left] -> Value [Right]
          double dx = (cRect.left - aRect.right).abs() / imgSize.width;
          score = 1.0 - (dx * 3.0); 
       } else if (cRect.right < aRect.left) { 
-         // RTL tables: Value [Left] <- Label [Right]
          double dx = (aRect.left - cRect.right).abs() / imgSize.width;
          score = 0.95 - (dx * 3.0);
       }
     } 
-    // BELOW LAYOUT: Value immediately below label
+    // RULE 3: BELOW LAYOUT (Vertical proximity)
     else if (cRect.top > aRect.top && (cRect.left - aRect.left).abs() < aRect.width * 0.8) {
       score = 0.5 - (dy * 4.0);
     }
@@ -201,19 +205,12 @@ class NeuralPostProcessor {
   String? _smartNameFallback(List<TextBlock> blocks) {
     if (blocks.isEmpty) return null;
     final topBlocks = blocks.where((b) => b.boundingBox.top < 500).toList();
-    
-    // Sort by largest area
-    topBlocks.sort((a, b) => (b.boundingBox.width * b.boundingBox.height)
-        .compareTo(a.boundingBox.width * a.boundingBox.height));
+    topBlocks.sort((a, b) => (b.boundingBox.width * b.boundingBox.height).compareTo(a.boundingBox.width * a.boundingBox.height));
     
     for (var b in topBlocks) {
-       final t = b.text.toLowerCase();
-       // Ignore generic labels and brand fragments
-       if (t.length > 3 && !TextParser.isMetadataBlock(t)) {
-         final result = b.text.split('\n').first.trim();
-         if (result != "Variety" && result != "Product" && result != "Crop") {
-           return result;
-         }
+       final t = b.text.toLowerCase().trim();
+       if (t.length > 3 && !TextParser.isMetadataBlock(t) && !_isGenericLabel(t)) {
+         return b.text.split('\n').first.trim();
        }
     }
     return null;
@@ -231,9 +228,10 @@ class _Anchor {
 class _ValueCandidate {
   final String text;
   final Rect boundingBox;
+  final String fullLineText;
   final bool isDate;
   final bool isWeight;
-  _ValueCandidate(this.text, this.boundingBox, this.isDate, this.isWeight);
+  _ValueCandidate(this.text, this.boundingBox, this.fullLineText, this.isDate, this.isWeight);
 }
 
 class _Pairing {

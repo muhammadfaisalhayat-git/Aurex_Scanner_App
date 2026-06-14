@@ -30,6 +30,12 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
   String? _capturedImagePath;
   bool _isFlashOn = false;
   
+  // Zoom state
+  double _minZoomLevel = 1.0;
+  double _maxZoomLevel = 1.0;
+  double _currentZoomLevel = 1.0;
+  double _baseZoomLevel = 1.0;
+
   // Real-time metadata
   List<_HighlightBox> _realtimeHighlights = [];
   List<TextBlock> _processingBlocks = [];
@@ -73,7 +79,6 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
 
   Future<void> _playBeep() async {
     try {
-      // In version 5.x, play() with a source is more reliable than resume() for repeat triggers
       await _audioPlayer.play(_beepSource, mode: PlayerMode.lowLatency);
     } catch (e) {
       debugPrint("Audio Play Error: $e");
@@ -104,6 +109,11 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
     
     try {
       await _controller!.initialize();
+      
+      // Get zoom capabilities
+      _minZoomLevel = await _controller!.getMinZoomLevel();
+      _maxZoomLevel = await _controller!.getMaxZoomLevel();
+      
       if (mounted) {
         setState(() {});
         _startImageStream();
@@ -113,12 +123,30 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
     }
   }
 
+  void _handleScaleStart(ScaleStartDetails details) {
+    _baseZoomLevel = _currentZoomLevel;
+  }
+
+  void _handleScaleUpdate(ScaleUpdateDetails details) {
+    if (_controller == null || !_controller!.value.isInitialized) return;
+
+    // Calculate new zoom level based on scale
+    double newZoomLevel = (_baseZoomLevel * details.scale).clamp(_minZoomLevel, _maxZoomLevel);
+    
+    if (newZoomLevel != _currentZoomLevel) {
+      _currentZoomLevel = newZoomLevel;
+      _controller!.setZoomLevel(_currentZoomLevel);
+      setState(() {});
+    }
+  }
+
   void _startImageStream() {
     if (_controller == null || !_controller!.value.isInitialized) return;
 
     _controller!.startImageStream((CameraImage image) async {
       if (_isProcessing || _isAnalyzing) return;
 
+      // Throttle analysis to once every 1200ms
       final now = DateTime.now().millisecondsSinceEpoch;
       if (now - _lastAnalysisTime < 1200) return;
       _lastAnalysisTime = now;
@@ -240,7 +268,6 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
       
       if (mounted) setState(() {});
 
-      // Get image dimensions for coordinate normalization
       final bytes = await imageFile.readAsBytes();
       final decoded = await decodeImageFromList(bytes);
       final imageSize = Size(decoded.width.toDouble(), decoded.height.toDouble());
@@ -253,18 +280,13 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
 
       final barcodes = await _barcodeScanner.processImage(inputImage);
       
-      // DEEP LEARNING STAGE: On-Device Neural Post-Processing
-      // Replaces cloud APIs with local spatial & semantic relationship modeling
       Product product = NeuralPostProcessor().refine(recognizedText, imageSize);
-      
-      // Apply category-specific learned layout weights
       product = LearningService().applySpatialIntelligence(product, recognizedText.blocks);
 
       product.barcode = barcodes.isNotEmpty ? barcodes.first.rawValue : null;
       product.productCode = product.barcode ?? product.productCode;
       product.imagePath = imageFile.path;
 
-      // Cleanup raw temp image
       File(rawImage.path).delete().catchError((_) {});
 
       if (mounted) {
@@ -299,15 +321,39 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          Positioned.fill(child: CameraPreview(_controller!)),
+          Positioned.fill(
+            child: GestureDetector(
+              onScaleStart: _handleScaleStart,
+              onScaleUpdate: _handleScaleUpdate,
+              child: CameraPreview(_controller!),
+            ),
+          ),
+          
           ..._realtimeHighlights.map((box) => _MappedHighlight(rect: box.rect, color: box.color)),
+          
           Container(decoration: const ShapeDecoration(shape: _LegacyScannerOverlay(laserPosition: 0, showLaser: false))),
+
+          // Zoom level indicator
+          if (_currentZoomLevel > 1.0)
+            Positioned(
+              bottom: 140, left: 0, right: 0,
+              child: Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(20)),
+                  child: Text("${_currentZoomLevel.toStringAsFixed(1)}x", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ),
+
           if (_isProcessing && _capturedImagePath != null) _buildProcessingUI(),
+
           if (!_isProcessing)
             Positioned(
               top: 50, left: 10,
               child: IconButton(icon: const Icon(Icons.arrow_back, color: Colors.white, size: 35), onPressed: () => Navigator.pop(context)),
             ),
+
           if (!_isProcessing)
             Positioned(
               bottom: 40, left: 0, right: 0,

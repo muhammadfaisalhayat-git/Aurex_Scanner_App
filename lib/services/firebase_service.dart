@@ -26,7 +26,6 @@ class FirebaseService {
     return _storage.ref().child("users/${user.uid}/images");
   }
 
-  /// Ensures the permanent product_images directory exists
   Future<String> _getImagesDirectory() async {
     final directory = await getApplicationDocumentsDirectory();
     final String path = p.join(directory.path, 'product_images');
@@ -47,7 +46,6 @@ class FirebaseService {
       String key = product.productCode.replaceAll(RegExp(r'[.#$\[\]/]'), '_');
       if (key.isEmpty) key = "ID_${product.id}";
       
-      // Attempt to upload image if it exists locally
       if (product.imagePath != null) {
         final File imageFile = File(product.imagePath!);
         if (imageFile.existsSync()) {
@@ -58,8 +56,6 @@ class FirebaseService {
           } catch (e) {
             debugPrint("Backup: Storage upload failed for $key: $e");
           }
-        } else {
-          debugPrint("Backup: Image file not found locally at ${product.imagePath}");
         }
       }
 
@@ -96,8 +92,6 @@ class FirebaseService {
     int processedCount = 0;
     List<Product> restoredProducts = [];
 
-    debugPrint("Restore: Starting for $total products...");
-
     for (var entry in rawData.entries) {
       try {
         final productData = Map<dynamic, dynamic>.from(entry.value as Map);
@@ -105,7 +99,6 @@ class FirebaseService {
         final String localImagePath = p.join(imagesPath, "$entryKey.jpg");
         final File localFile = File(localImagePath);
 
-        // Crucial: Standardize image path for this device
         productData['imagePath'] = null; 
 
         try {
@@ -113,27 +106,19 @@ class FirebaseService {
           
           if (localFile.existsSync() && localFile.lengthSync() > 0) {
             productData['imagePath'] = localImagePath;
-            debugPrint("Restore: Image already cached for $entryKey");
           } else {
-            // Check if exists on server using download URL as validation
             try {
-              final String url = await ref.getDownloadURL().timeout(const Duration(seconds: 5));
-              if (url.isNotEmpty) {
-                final Uint8List? data = await ref.getData(10 * 1024 * 1024).timeout(const Duration(seconds: 15)); 
-                if (data != null) {
-                  await localFile.writeAsBytes(data);
+              final Uint8List? data = await ref.getData(10 * 1024 * 1024).timeout(const Duration(seconds: 10)); 
+              if (data != null) {
+                await localFile.writeAsBytes(data);
+                // RE-VERIFY existence immediately after write
+                if (localFile.existsSync()) {
                   productData['imagePath'] = localImagePath;
-                  debugPrint("Restore: Downloaded image for $entryKey");
+                  debugPrint("Restore: Verified image for $entryKey");
                 }
               }
-            } on FirebaseException catch (e) {
-              if (e.code == 'object-not-found') {
-                debugPrint("Restore: Image $entryKey.jpg does not exist on server Storage.");
-              } else {
-                debugPrint("Restore: Storage error for $entryKey: $e");
-              }
             } catch (e) {
-              debugPrint("Restore: Non-firebase error for $entryKey: $e");
+              debugPrint("Restore: Image download failed for $entryKey: $e");
             }
           }
         } catch (e) {
@@ -143,7 +128,7 @@ class FirebaseService {
         productData['id'] = null; 
         restoredProducts.add(Product.fromMap(productData));
       } catch (e) {
-        debugPrint("Restore: Error parsing product: $e");
+        debugPrint("Restore: Error parsing entry: $e");
       } finally {
         processedCount++;
         if (onProgress != null) onProgress(processedCount, total);
@@ -153,7 +138,6 @@ class FirebaseService {
     if (restoredProducts.isNotEmpty) {
       await dbService.deleteAll();
       await dbService.batchInsertProducts(restoredProducts);
-      debugPrint("Restore Complete: ${restoredProducts.length} products saved.");
     }
     
     return restoredProducts.length;
