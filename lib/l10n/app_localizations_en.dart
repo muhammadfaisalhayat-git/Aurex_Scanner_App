@@ -117,10 +117,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get clearAllFilters => 'Clear All Filters';
 
   @override
-  String expiredBy(int days) => 'Expired by: $days days';
+  String expiredBy(int days) {
+    return 'Expired by: $days days';
+  }
 
   @override
-  String remainingDays(int days) => 'Remaining: $days days';
+  String remainingDays(int days) {
+    return 'Remaining: $days days';
+  }
 
   @override
   String get pleaseWaitProcessing => 'Please wait the picture is processing...';
@@ -195,7 +199,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get continueWithGoogle => 'CONTINUE WITH GOOGLE';
 
   @override
-  String get biometricLoginError => 'Please log in with email first to enable biometrics.';
+  String get biometricLoginError =>
+      'Please log in with email first to enable biometrics.';
 
   @override
   String get tagline => 'Aurex Scanner';

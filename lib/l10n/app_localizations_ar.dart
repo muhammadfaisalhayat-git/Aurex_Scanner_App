@@ -117,10 +117,14 @@ class AppLocalizationsAr extends AppLocalizations {
   String get clearAllFilters => 'مسح جميع عوامل التصفية';
 
   @override
-  String expiredBy(int days) => 'منتهي منذ: $days أيام';
+  String expiredBy(int days) {
+    return 'منتهي منذ: $days أيام';
+  }
 
   @override
-  String remainingDays(int days) => 'متبقي: $days أيام';
+  String remainingDays(int days) {
+    return 'متبقي: $days أيام';
+  }
 
   @override
   String get pleaseWaitProcessing => 'يرجى الانتظار، الصورة قيد المعالجة...';
@@ -195,7 +199,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get continueWithGoogle => 'المتابعة باستخدام جوجل';
 
   @override
-  String get biometricLoginError => 'يرجى تسجيل الدخول بالبريد الإلكتروني أولاً لتمكين القياسات الحيوية.';
+  String get biometricLoginError =>
+      'يرجى تسجيل الدخول بالبريد الإلكتروني أولاً لتمكين القياسات الحيوية.';
 
   @override
   String get tagline => 'أوريكس سكانر';
@@ -216,5 +221,6 @@ class AppLocalizationsAr extends AppLocalizations {
   String get profileUpdated => 'تم تحديث الملف الشخصي بنجاح';
 
   @override
-  String get biometricSubtitle => 'استخدم بصمة الإصبع لتسجيل الدخول في المرة القادمة';
+  String get biometricSubtitle =>
+      'استخدم بصمة الإصبع لتسجيل الدخول في المرة القادمة';
 }
