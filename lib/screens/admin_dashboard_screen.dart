@@ -6,6 +6,7 @@ import '../widgets/premium_card.dart';
 import '../widgets/product_card.dart';
 import '../utils/date_utils.dart';
 import 'result_screen.dart';
+import '../l10n/app_localizations.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -48,16 +49,17 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
   @override
   Widget build(BuildContext context) {
     const primaryGreen = Color(0xFF388E3C);
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text("Admin Dashboard", style: TextStyle(color: Colors.white)),
+        title: Text(l10n.adminDashboard, style: const TextStyle(color: Colors.white)),
         backgroundColor: primaryGreen,
         leading: const Icon(Icons.grid_view, color: Colors.white),
         actions: [IconButton(onPressed: _loadData, icon: const Icon(Icons.refresh, color: Colors.white))],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(48),
-          child: Container(color: Colors.white, child: TabBar(controller: _tabController, labelColor: primaryGreen, unselectedLabelColor: Colors.grey, indicatorColor: primaryGreen, tabs: const [Tab(text: "MANAGE PRODUCTS"), Tab(text: "MANAGE USERS")])),
+          child: Container(color: Colors.white, child: TabBar(controller: _tabController, labelColor: primaryGreen, unselectedLabelColor: Colors.grey, indicatorColor: primaryGreen, tabs: [Tab(text: l10n.manageProducts.toUpperCase()), Tab(text: l10n.manageUsers.toUpperCase())])),
         ),
       ),
       body: TabBarView(controller: _tabController, children: [_buildManageProductsTab(), _buildManageUsersTab()]),
@@ -65,23 +67,24 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
   }
 
   Widget _buildManageProductsTab() {
+    final l10n = AppLocalizations.of(context)!;
     return _isLoading ? const Center(child: CircularProgressIndicator()) : SingleChildScrollView(
       padding: const EdgeInsets.symmetric(vertical: 16),
       child: Column(children: [
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Row(children: [
-            Expanded(child: _buildStatCard(_totalProducts.toString(), "TOTAL ITEMS", const Color(0xFF2E7D32))),
+            Expanded(child: _buildStatCard(_totalProducts.toString(), l10n.totalItems.toUpperCase(), const Color(0xFF2E7D32))),
             const SizedBox(width: 8),
-            Expanded(child: _buildStatCard(_expiredCount.toString(), "EXPIRED", const Color(0xFFE57373))),
+            Expanded(child: _buildStatCard(_expiredCount.toString(), l10n.expired.toUpperCase(), const Color(0xFFE57373))),
             const SizedBox(width: 8),
-            Expanded(child: _buildStatCard(_nearExpiryCount.toString(), "NEAR EXPIRY", const Color(0xFFFFB74D))),
+            Expanded(child: _buildStatCard(_nearExpiryCount.toString(), l10n.nearExpiry.toUpperCase(), const Color(0xFFFFB74D))),
           ]),
         ),
         const SizedBox(height: 20),
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16),
-          child: PremiumCard(title: "Premium Insights"),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: PremiumCard(title: l10n.premiumInsights),
         ),
         const SizedBox(height: 10),
         ListView.builder(

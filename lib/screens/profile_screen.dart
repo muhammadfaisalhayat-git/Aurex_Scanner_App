@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import '../services/biometric_service.dart';
+import '../l10n/app_localizations.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -49,6 +50,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _saveProfile() async {
+    final l10n = AppLocalizations.of(context)!;
     setState(() => _isLoading = true);
     try {
       await _auth.currentUser?.updateDisplayName(_nameController.text);
@@ -59,7 +61,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Profile updated successfully")),
+          SnackBar(content: Text(l10n.profileUpdated)),
         );
         Navigator.pop(context);
       }
@@ -76,9 +78,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Edit Profile"),
+        title: Text(l10n.editProfile),
         backgroundColor: const Color(0xFF5E7D6A),
         foregroundColor: Colors.white,
       ),
@@ -93,8 +96,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             const SizedBox(height: 16),
             SwitchListTile(
-              title: const Text("Enable Biometric Login"),
-              subtitle: const Text("Use fingerprint to log in next time"),
+              title: Text(l10n.enableBiometric),
+              subtitle: Text(l10n.biometricSubtitle),
               value: _biometricsEnabled,
               onChanged: (bool value) async {
                 if (value) {
@@ -112,39 +115,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
             const SizedBox(height: 32),
             TextField(
               controller: _nameController,
-              decoration: const InputDecoration(
-                labelText: "Full Name",
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.person_outline),
+              decoration: InputDecoration(
+                labelText: l10n.fullName,
+                border: const OutlineInputBorder(),
+                prefixIcon: const Icon(Icons.person_outline),
               ),
             ),
             const SizedBox(height: 16),
             TextField(
               controller: _emailController,
               enabled: false,
-              decoration: const InputDecoration(
-                labelText: "Email Address",
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.email_outlined),
+              decoration: InputDecoration(
+                labelText: l10n.emailAddress,
+                border: const OutlineInputBorder(),
+                prefixIcon: const Icon(Icons.email_outlined),
               ),
-            ),
-            const SizedBox(height: 16),
-            SwitchListTile(
-              title: const Text("Enable Biometric Login"),
-              subtitle: const Text("Use fingerprint to log in next time"),
-              value: _biometricsEnabled,
-              onChanged: (bool value) async {
-                if (value) {
-                  final authenticated = await _biometricService.authenticate();
-                  if (authenticated) {
-                    await _biometricService.setBiometricsEnabled(true);
-                    setState(() => _biometricsEnabled = true);
-                  }
-                } else {
-                  await _biometricService.setBiometricsEnabled(false);
-                  setState(() => _biometricsEnabled = false);
-                }
-              },
             ),
             const SizedBox(height: 32),
             SizedBox(
@@ -158,7 +143,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
                 child: _isLoading
                     ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text("SAVE CHANGES", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                    : Text(l10n.saveChanges, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
               ),
             ),
           ],

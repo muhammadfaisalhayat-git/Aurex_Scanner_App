@@ -82,4 +82,139 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get wipeData => 'مسح البيانات من الخادم';
+
+  @override
+  String get companyName => 'بن عوف الزراعية';
+
+  @override
+  String get searchHint => 'بحث بالاسم، التاريخ، الفئة...';
+
+  @override
+  String get projectOf => 'مشروع من أوريكس إي آر بي';
+
+  @override
+  String get home => 'الرئيسية';
+
+  @override
+  String get allCategories => 'جميع الفئات';
+
+  @override
+  String get allWarehouses => 'جميع المستودعات';
+
+  @override
+  String get filter => 'تصفية:';
+
+  @override
+  String get filterBy => 'تصفية حسب:';
+
+  @override
+  String get noProductsFound => 'لم يتم العثور على منتجات.';
+
+  @override
+  String get noProductsMatch => 'لا توجد منتجات تطابق عوامل التصفية الخاصة بك';
+
+  @override
+  String get clearAllFilters => 'مسح جميع عوامل التصفية';
+
+  @override
+  String expiredBy(int days) => 'منتهي منذ: $days أيام';
+
+  @override
+  String remainingDays(int days) => 'متبقي: $days أيام';
+
+  @override
+  String get pleaseWaitProcessing => 'يرجى الانتظار، الصورة قيد المعالجة...';
+
+  @override
+  String get noImageAvailable => 'لا توجد صورة متاحة';
+
+  @override
+  String get productDetails => 'تفاصيل المنتج';
+
+  @override
+  String get settings => 'الإعدادات';
+
+  @override
+  String get account => 'الحساب';
+
+  @override
+  String get versionEdition => 'v1.0.0 - إصدار بن عوف';
+
+  @override
+  String get configuration => 'التكوين';
+
+  @override
+  String get theme => 'المظهر';
+
+  @override
+  String get systemDefault => 'تلقائي النظام';
+
+  @override
+  String get light => 'فاتح';
+
+  @override
+  String get dark => 'داكن';
+
+  @override
+  String get enableBiometric => 'تفعيل تسجيل الدخول البيومتري';
+
+  @override
+  String get testScanBeep => 'اختبار صوت المسح';
+
+  @override
+  String get cleanCloudBackups => 'مسح النسخ الاحتياطية السحابية';
+
+  @override
+  String get backupToCloud => 'نسخ احتياطي للسحابة (RTDB)';
+
+  @override
+  String get restoreFromCloudRTDB => 'استعادة من السحابة (RTDB)';
+
+  @override
+  String get premiumInsights => 'رؤى متميزة';
+
+  @override
+  String get email => 'البريد الإلكتروني';
+
+  @override
+  String get password => 'كلمة المرور';
+
+  @override
+  String get rememberMe => 'تذكرني';
+
+  @override
+  String get login => 'تسجيل الدخول';
+
+  @override
+  String get register => 'إنشاء حساب';
+
+  @override
+  String get forgotPassword => 'نسيت كلمة المرور؟';
+
+  @override
+  String get continueWithGoogle => 'المتابعة باستخدام جوجل';
+
+  @override
+  String get biometricLoginError => 'يرجى تسجيل الدخول بالبريد الإلكتروني أولاً لتمكين القياسات الحيوية.';
+
+  @override
+  String get tagline => 'أوريكس سكانر';
+
+  @override
+  String get editProfile => 'تعديل الملف الشخصي';
+
+  @override
+  String get fullName => 'الاسم الكامل';
+
+  @override
+  String get emailAddress => 'البريد الإلكتروني';
+
+  @override
+  String get saveChanges => 'حفظ التغييرات';
+
+  @override
+  String get profileUpdated => 'تم تحديث الملف الشخصي بنجاح';
+
+  @override
+  String get biometricSubtitle => 'استخدم بصمة الإصبع لتسجيل الدخول في المرة القادمة';
 }

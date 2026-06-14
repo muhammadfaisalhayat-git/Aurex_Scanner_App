@@ -23,5 +23,60 @@
   "logout": "تسجيل الخروج",
   "backupToServer": "نسخ احتياطي للخادم",
   "restoreFromCloud": "استعادة من السحابة",
-  "wipeData": "مسح البيانات من الخادم"
+  "wipeData": "مسح البيانات من الخادم",
+  "companyName": "بن عوف الزراعية",
+  "searchHint": "بحث بالاسم، التاريخ، الفئة...",
+  "projectOf": "مشروع من أوريكس إي آر بي",
+  "home": "الرئيسية",
+  "allCategories": "جميع الفئات",
+  "allWarehouses": "جميع المستودعات",
+  "filter": "تصفية:",
+  "filterBy": "تصفية حسب:",
+  "noProductsFound": "لم يتم العثور على منتجات.",
+  "noProductsMatch": "لا توجد منتجات تطابق عوامل التصفية الخاصة بك",
+  "clearAllFilters": "مسح جميع عوامل التصفية",
+  "expiredBy": "منتهي منذ: {days} أيام",
+  "@expiredBy": {
+    "placeholders": {
+      "days": { "type": "int" }
+    }
+  },
+  "remainingDays": "متبقي: {days} أيام",
+  "@remainingDays": {
+    "placeholders": {
+      "days": { "type": "int" }
+    }
+  },
+  "pleaseWaitProcessing": "يرجى الانتظار، الصورة قيد المعالجة...",
+  "noImageAvailable": "لا توجد صورة متاحة",
+  "productDetails": "تفاصيل المنتج",
+  "settings": "الإعدادات",
+  "account": "الحساب",
+  "versionEdition": "v1.0.0 - إصدار بن عوف",
+  "configuration": "التكوين",
+  "theme": "المظهر",
+  "systemDefault": "تلقائي النظام",
+  "light": "فاتح",
+  "dark": "داكن",
+  "enableBiometric": "تفعيل تسجيل الدخول البيومتري",
+  "testScanBeep": "اختبار صوت المسح",
+  "cleanCloudBackups": "مسح النسخ الاحتياطية السحابية",
+  "backupToCloud": "نسخ احتياطي للسحابة (RTDB)",
+  "restoreFromCloudRTDB": "استعادة من السحابة (RTDB)",
+  "premiumInsights": "رؤى متميزة",
+  "email": "البريد الإلكتروني",
+  "password": "كلمة المرور",
+  "rememberMe": "تذكرني",
+  "login": "تسجيل الدخول",
+  "register": "إنشاء حساب",
+  "forgotPassword": "نسيت كلمة المرور؟",
+  "continueWithGoogle": "المتابعة باستخدام جوجل",
+  "biometricLoginError": "يرجى تسجيل الدخول بالبريد الإلكتروني أولاً لتمكين القياسات الحيوية.",
+  "tagline": "أوريكس سكانر",
+  "editProfile": "تعديل الملف الشخصي",
+  "fullName": "الاسم الكامل",
+  "emailAddress": "البريد الإلكتروني",
+  "saveChanges": "حفظ التغييرات",
+  "profileUpdated": "تم تحديث الملف الشخصي بنجاح",
+  "biometricSubtitle": "استخدم بصمة الإصبع لتسجيل الدخول في المرة القادمة"
 }

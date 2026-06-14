@@ -7,6 +7,7 @@ import '../services/learning_service.dart';
 import '../widgets/highlighted_image.dart';
 import 'field_scanner_screen.dart';
 import 'dart:async';
+import '../l10n/app_localizations.dart';
 
 class ResultScreen extends StatefulWidget {
   final Product product;
@@ -78,10 +79,11 @@ class _ResultScreenState extends State<ResultScreen> {
   @override
   Widget build(BuildContext context) {
     const primaryGreen = Color(0xFF388E3C);
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text("Product Details", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        title: Text(l10n.productDetails, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         backgroundColor: primaryGreen,
         leading: const Icon(Icons.grid_view, color: Colors.white),
         actions: [IconButton(icon: const Icon(Icons.notifications, color: Colors.white), onPressed: () {})],
@@ -98,12 +100,12 @@ class _ResultScreenState extends State<ResultScreen> {
           else
             Container(
               height: 220, width: double.infinity, color: Colors.grey.shade200,
-              child: const Column(
+              child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.image_not_supported, size: 60, color: Colors.grey),
-                  SizedBox(height: 10),
-                  Text("No image available", style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+                  const Icon(Icons.image_not_supported, size: 60, color: Colors.grey),
+                  const SizedBox(height: 10),
+                  Text(l10n.noImageAvailable, style: const TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
                 ],
               ),
             ),
@@ -111,12 +113,12 @@ class _ResultScreenState extends State<ResultScreen> {
           Padding(
             padding: const EdgeInsets.all(16),
             child: Column(children: [
-              _buildField("Product Code", _codeController),
-              _buildField("Product Name", _nameController, isAr: true),
+              _buildField(l10n.productCode, _codeController),
+              _buildField(l10n.productName, _nameController, isAr: true),
               Row(children: [
-                Expanded(child: _buildField("MFG Date", _mfgController)),
+                Expanded(child: _buildField(l10n.mfgDate, _mfgController)),
                 const SizedBox(width: 10),
-                Expanded(child: _buildField("EXP Date", _expController)),
+                Expanded(child: _buildField(l10n.expDate, _expController)),
               ]),
               
               Container(
@@ -132,14 +134,14 @@ class _ResultScreenState extends State<ResultScreen> {
                 ),
               ),
 
-              _buildField("Warehouse", _warehouseController, isAr: true),
-              _buildField("Quantity", _qtyController),
-              _buildField("Size/Weight", _sizeController),
+              _buildField(l10n.warehouse, _warehouseController, isAr: true),
+              _buildField(l10n.quantity, _qtyController),
+              _buildField(l10n.size, _sizeController),
               
               const SizedBox(height: 20),
               SizedBox(width: double.infinity, height: 60, child: ElevatedButton(
                 style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF5E7D6A), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
-                onPressed: _save, child: const Text("UPDATE PRODUCT", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                onPressed: _save, child: Text(l10n.updateProduct.toUpperCase(), style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
               )),
             ]),
           )

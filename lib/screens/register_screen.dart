@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:provider/provider.dart';
 import '../services/locale_provider.dart';
+import '../l10n/app_localizations.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -130,6 +131,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Widget build(BuildContext context) {
     const primaryGreen = Color(0xFF5EBA61);
     final localeProvider = Provider.of<LocaleProvider>(context);
+    final l10n = AppLocalizations.of(context)!;
     final isAr = localeProvider.locale.languageCode == 'ar';
 
     return Scaffold(
@@ -142,7 +144,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          isAr ? "إنشاء حساب جديد" : "Create Account",
+          l10n.register,
           style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
         ),
       ),
@@ -154,21 +156,21 @@ class _RegisterScreenState extends State<RegisterScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  "Join Aurex Scanner",
-                  style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Color(0xFF333333)),
+                Text(
+                  l10n.register,
+                  style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Color(0xFF333333)),
                 ),
                 const SizedBox(height: 8),
-                const Text(
-                  "Fill in the details to request access.",
-                  style: TextStyle(fontSize: 16, color: Colors.grey),
+                Text(
+                  l10n.tagline,
+                  style: const TextStyle(fontSize: 16, color: Colors.grey),
                 ),
                 const SizedBox(height: 40),
                 
                 // Name Field
                 _buildTextField(
                   controller: _nameController,
-                  hint: isAr ? "الاسم الكامل" : "Full Name",
+                  hint: l10n.fullName,
                   icon: Icons.person_outline,
                   validator: (val) => val == null || val.isEmpty ? 'Name is required' : null,
                 ),
@@ -177,7 +179,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 // Email Field
                 _buildTextField(
                   controller: _emailController,
-                  hint: isAr ? "البريد الإلكتروني" : "Email Address",
+                  hint: l10n.email,
                   icon: Icons.email_outlined,
                   keyboardType: TextInputType.emailAddress,
                   validator: (val) => val == null || !val.contains('@') ? 'Invalid email' : null,
@@ -187,7 +189,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 // Password Field
                 _buildTextField(
                   controller: _passwordController,
-                  hint: isAr ? "كلمة المرور" : "Password",
+                  hint: l10n.password,
                   icon: Icons.lock_outline,
                   obscureText: !_isPasswordVisible,
                   suffixIcon: IconButton(
@@ -198,9 +200,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 const SizedBox(height: 40),
 
-                const Text(
-                  "Warehouse Information",
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: primaryGreen),
+                Text(
+                  l10n.warehouse,
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: primaryGreen),
                 ),
                 const Divider(),
                 const SizedBox(height: 10),
@@ -208,7 +210,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 // Warehouse Name
                 _buildTextField(
                   controller: _warehouseNameController,
-                  hint: isAr ? "اسم المستودع" : "Warehouse Name",
+                  hint: l10n.warehouse,
                   icon: Icons.warehouse_outlined,
                   validator: (val) => val == null || val.isEmpty ? 'Warehouse name is required' : null,
                 ),
@@ -217,7 +219,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 // Warehouse Code
                 _buildTextField(
                   controller: _warehouseCodeController,
-                  hint: isAr ? "كود المستودع" : "Warehouse Code",
+                  hint: l10n.productCode,
                   icon: Icons.qr_code_outlined,
                   validator: (val) => val == null || val.isEmpty ? 'Warehouse code is required' : null,
                 ),
@@ -237,7 +239,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     child: _isLoading 
                         ? const CircularProgressIndicator(color: Colors.white) 
                         : Text(
-                            isAr ? "تسجيل الآن" : "REGISTER NOW", 
+                            l10n.register.toUpperCase(),
                             style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: 1.2)
                           ),
                   ),

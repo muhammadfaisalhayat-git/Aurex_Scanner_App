@@ -9,6 +9,7 @@ import 'services/notification_service.dart';
 import 'services/background_service.dart';
 import 'screens/login_screen.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'l10n/app_localizations.dart';
 // import 'firebase_options.dart'; // Commented out until generated
 
 void main() async {
@@ -54,15 +55,8 @@ class AurexApp extends StatelessWidget {
         useMaterial3: true,
       ),
       locale: localeProvider.locale,
-      localizationsDelegates: const [
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-      ],
-      supportedLocales: const [
-        Locale('en', ''),
-        Locale('ar', ''),
-      ],
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
       home: const LoginScreen(),
     );
   }

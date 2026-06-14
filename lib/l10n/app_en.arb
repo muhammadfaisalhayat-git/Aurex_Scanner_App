@@ -23,5 +23,60 @@
   "logout": "Logout",
   "backupToServer": "Backup to Server",
   "restoreFromCloud": "Restore from Cloud",
-  "wipeData": "Wipe Data from Server"
+  "wipeData": "Wipe Data from Server",
+  "companyName": "Bin Awf Agricultural",
+  "searchHint": "Search name, date, cat...",
+  "projectOf": "A Project of Aurex ERP",
+  "home": "Home",
+  "allCategories": "All Categories",
+  "allWarehouses": "All Warehouses",
+  "filter": "Filter:",
+  "filterBy": "Filter By:",
+  "noProductsFound": "No products found.",
+  "noProductsMatch": "No products match your filters",
+  "clearAllFilters": "Clear All Filters",
+  "expiredBy": "Expired by: {days} days",
+  "@expiredBy": {
+    "placeholders": {
+      "days": { "type": "int" }
+    }
+  },
+  "remainingDays": "Remaining: {days} days",
+  "@remainingDays": {
+    "placeholders": {
+      "days": { "type": "int" }
+    }
+  },
+  "pleaseWaitProcessing": "Please wait the picture is processing...",
+  "noImageAvailable": "No image available",
+  "productDetails": "Product Details",
+  "settings": "Settings",
+  "account": "Account",
+  "versionEdition": "v1.0.0 - Bin Awf Edition",
+  "configuration": "Configuration",
+  "theme": "Theme",
+  "systemDefault": "System Default",
+  "light": "Light",
+  "dark": "Dark",
+  "enableBiometric": "Enable Biometric Login",
+  "testScanBeep": "TEST SCAN BEEP SOUND",
+  "cleanCloudBackups": "CLEAN CLOUD BACKUPS",
+  "backupToCloud": "BACKUP TO CLOUD (RTDB)",
+  "restoreFromCloudRTDB": "RESTORE FROM CLOUD (RTDB)",
+  "premiumInsights": "Premium Insights",
+  "email": "Email",
+  "password": "Password",
+  "rememberMe": "Remember Me",
+  "login": "LOGIN",
+  "register": "REGISTER",
+  "forgotPassword": "Forgot Password?",
+  "continueWithGoogle": "CONTINUE WITH GOOGLE",
+  "biometricLoginError": "Please log in with email first to enable biometrics.",
+  "tagline": "Aurex Scanner",
+  "editProfile": "Edit Profile",
+  "fullName": "Full Name",
+  "emailAddress": "Email Address",
+  "saveChanges": "SAVE CHANGES",
+  "profileUpdated": "Profile updated successfully",
+  "biometricSubtitle": "Use fingerprint to log in next time"
 }

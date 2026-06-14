@@ -10,6 +10,7 @@ import '../screens/product_list_screen.dart';
 import '../screens/scanner_screen.dart';
 import '../screens/admin_dashboard_screen.dart';
 import '../screens/settings_screen.dart';
+import '../l10n/app_localizations.dart';
 
 class AppDrawer extends StatefulWidget {
   const AppDrawer({super.key});
@@ -25,6 +26,7 @@ class _AppDrawerState extends State<AppDrawer> {
     final firebaseService = Provider.of<FirebaseService>(context, listen: false);
     final dbService = Provider.of<DatabaseService>(context, listen: false);
     final localeProvider = Provider.of<LocaleProvider>(context);
+    final l10n = AppLocalizations.of(context)!;
     
     const primaryGreen = Color(0xFF388E3C);
     const itemBgColor = Color(0xFFF1F8E9);
@@ -41,7 +43,7 @@ class _AppDrawerState extends State<AppDrawer> {
             child: Column(
               children: [
                 Text(
-                  isAr ? "بن عوف الزراعية" : "Bin Awf Agricultural",
+                  l10n.companyName,
                   style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 25),
@@ -70,22 +72,22 @@ class _AppDrawerState extends State<AppDrawer> {
             child: ListView(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               children: [
-                _buildDrawerItem(context, Icons.camera_alt_outlined, isAr ? "مسح المنتج" : "Scan Product", () {
+                _buildDrawerItem(context, Icons.camera_alt_outlined, l10n.scanProduct, () {
                   Navigator.pop(context);
                   Navigator.push(context, MaterialPageRoute(builder: (context) => const ScannerScreen()));
                 }, itemBgColor),
                 
-                _buildDrawerItem(context, Icons.access_time, isAr ? "قائمة المنتجات" : "Product List", () {
+                _buildDrawerItem(context, Icons.access_time, l10n.productList, () {
                   Navigator.pop(context);
                   Navigator.push(context, MaterialPageRoute(builder: (context) => const ProductListScreen()));
                 }, itemBgColor),
                 
-                _buildDrawerItem(context, Icons.lock_outline, isAr ? "لوحة تحكم المسؤول" : "Admin Dashboard", () {
+                _buildDrawerItem(context, Icons.lock_outline, l10n.adminDashboard, () {
                   Navigator.pop(context);
                   Navigator.push(context, MaterialPageRoute(builder: (context) => const AdminDashboardScreen()));
                 }, itemBgColor),
                 
-                _buildDrawerItem(context, Icons.save_outlined, isAr ? "نسخ احتياطي للخادم" : "Backup to Server", () async {
+                _buildDrawerItem(context, Icons.save_outlined, l10n.backupToServer, () async {
                   final fs = Provider.of<FirebaseService>(context, listen: false);
                   final ds = Provider.of<DatabaseService>(context, listen: false);
                   
@@ -93,21 +95,21 @@ class _AppDrawerState extends State<AppDrawer> {
                   
                   final products = await ds.getProducts();
                   if (products.isEmpty) {
-                    if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(isAr ? "لا توجد بيانات للنسخ الاحتياطي" : "No local data to backup")));
+                    if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(l10n.noProductsFound)));
                     return;
                   }
                   
-                  _showGlobalProgressDialog(context, isAr ? "نسخ احتياطي" : "Backup", isAr ? "جاري النسخ..." : "Backing up...", (onProgressUpdate) async {
+                  _showGlobalProgressDialog(context, l10n.backupToServer, l10n.backupToServer, (onProgressUpdate) async {
                     await fs.backupAll(products, onProgress: (current, total) => onProgressUpdate(current, total));
                     return true;
                   });
                 }, itemBgColor),
                 
-                _buildDrawerItem(context, Icons.download_outlined, isAr ? "استعادة من الخادم" : "Restore from Server", () {
+                _buildDrawerItem(context, Icons.download_outlined, l10n.restoreFromCloud, () {
                   final fs = Provider.of<FirebaseService>(context, listen: false);
                   Navigator.pop(context); // Close drawer
                   
-                  _showGlobalProgressDialog(context, isAr ? "استعادة" : "Restore", isAr ? "جاري الاستعادة..." : "Restoring data...", (onProgressUpdate) async {
+                  _showGlobalProgressDialog(context, l10n.restoreFromCloud, l10n.restoreFromCloud, (onProgressUpdate) async {
                     int? count = await fs.restoreAll(onProgress: (current, total) => onProgressUpdate(current, total));
                     return count;
                   });
@@ -115,17 +117,17 @@ class _AppDrawerState extends State<AppDrawer> {
                 
                 _buildDrawerItem(context, Icons.language, isAr ? "English" : "العربية", () => localeProvider.toggleLocale(), itemBgColor),
                 
-                _buildDrawerItem(context, Icons.settings_outlined, isAr ? "الإعدادات" : "Settings", () {
+                _buildDrawerItem(context, Icons.settings_outlined, l10n.settings, () {
                   Navigator.pop(context);
                   Navigator.push(context, MaterialPageRoute(builder: (context) => const SettingsScreen()));
                 }, itemBgColor),
                 
-                const Padding(
-                  padding: EdgeInsets.only(left: 8.0, top: 25, bottom: 10),
-                  child: Text("Account", style: TextStyle(color: Colors.grey, fontSize: 16)),
+                Padding(
+                  padding: const EdgeInsets.only(left: 8.0, top: 25, bottom: 10),
+                  child: Text(l10n.account, style: const TextStyle(color: Colors.grey, fontSize: 16)),
                 ),
                 
-                _buildDrawerItem(context, Icons.power_settings_new, isAr ? "تسجيل الخروج" : "Sign Out", () async {
+                _buildDrawerItem(context, Icons.power_settings_new, l10n.logout, () async {
                   await FirebaseAuth.instance.signOut();
                   if (mounted) {
                     Navigator.pushAndRemoveUntil(
@@ -142,7 +144,7 @@ class _AppDrawerState extends State<AppDrawer> {
           Padding(
             padding: const EdgeInsets.only(bottom: 20),
             child: Text(
-              isAr ? "v1.0.0 - إصدار بن عوف" : "v1.0.0 - Bin Awf Edition", 
+              l10n.versionEdition,
               style: const TextStyle(color: Colors.grey, fontSize: 12)
             ),
           ),

@@ -3,6 +3,7 @@ import '../models/product.dart';
 import '../utils/date_utils.dart';
 import 'dart:io';
 import 'blinking_widget.dart';
+import '../l10n/app_localizations.dart';
 
 class ProductCard extends StatelessWidget {
   final Product product;
@@ -14,6 +15,7 @@ class ProductCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final int days = AppDateUtils.calculateRemainingDays(product.expDate);
     final bool isExpired = AppDateUtils.isExpired(product.expDate);
+    final l10n = AppLocalizations.of(context)!;
     
     Color statusColor = Colors.green;
     bool shouldBlink = false;
@@ -73,8 +75,8 @@ class ProductCard extends StatelessWidget {
                     ),
                     Text(
                       isExpired 
-                        ? "Expired by: ${days.abs()} days"
-                        : "Remaining: $days days",
+                        ? l10n.expiredBy(days.abs())
+                        : l10n.remainingDays(days),
                       style: TextStyle(
                         color: statusColor,
                         fontWeight: FontWeight.bold,

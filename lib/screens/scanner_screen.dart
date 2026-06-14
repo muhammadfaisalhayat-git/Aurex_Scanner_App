@@ -15,6 +15,7 @@ import '../services/neural_post_processor.dart';
 import '../services/learning_service.dart';
 import 'result_screen.dart';
 import 'product_list_screen.dart';
+import '../l10n/app_localizations.dart';
 
 class ScannerScreen extends StatefulWidget {
   const ScannerScreen({super.key});
@@ -420,13 +421,13 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
                 top: laserY, left: 0, right: 0,
                 child: Container(height: 3, decoration: BoxDecoration(color: Colors.greenAccent, boxShadow: [BoxShadow(color: Colors.greenAccent, blurRadius: 15, spreadRadius: 2)])),
               ),
-              const Center(
+              Center(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    CircularProgressIndicator(color: Colors.white, strokeWidth: 4),
-                    SizedBox(height: 30),
-                    Text("Please wait the picture is processing...", style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold, decoration: TextDecoration.none)),
+                    const CircularProgressIndicator(color: Colors.white, strokeWidth: 4),
+                    const SizedBox(height: 30),
+                    Text(AppLocalizations.of(context)!.pleaseWaitProcessing, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold, decoration: TextDecoration.none)),
                   ],
                 ),
               ),

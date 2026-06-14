@@ -5,6 +5,7 @@ import '../services/database_service.dart';
 import '../widgets/product_card.dart';
 import '../utils/date_utils.dart';
 import 'result_screen.dart';
+import '../l10n/app_localizations.dart';
 
 class ProductListScreen extends StatefulWidget {
   const ProductListScreen({super.key});
@@ -81,6 +82,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
   }
 
   void _showCategoryPicker() {
+    final l10n = AppLocalizations.of(context)!;
     final categories = _allProducts
         .map((p) => p.category ?? "General")
         .toSet()
@@ -92,7 +94,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
         shrinkWrap: true,
         children: [
           ListTile(
-            title: const Text("All Categories", style: TextStyle(fontWeight: FontWeight.bold)),
+            title: Text(l10n.allCategories, style: const TextStyle(fontWeight: FontWeight.bold)),
             onTap: () {
               setState(() => _selectedCategory = null);
               _applyFilters();
@@ -113,6 +115,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
   }
 
   void _showWarehousePicker() {
+    final l10n = AppLocalizations.of(context)!;
     final warehouses = _allProducts
         .where((p) => p.warehouseName != null && p.warehouseName!.isNotEmpty)
         .map((p) => p.warehouseName!)
@@ -130,7 +133,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
         shrinkWrap: true,
         children: [
           ListTile(
-            title: const Text("All Warehouses", style: TextStyle(fontWeight: FontWeight.bold)),
+            title: Text(l10n.allWarehouses, style: const TextStyle(fontWeight: FontWeight.bold)),
             onTap: () {
               setState(() => _selectedWarehouse = null);
               _applyFilters();
@@ -153,6 +156,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
   @override
   Widget build(BuildContext context) {
     const primaryGreen = Color(0xFF388E3C);
+    final l10n = AppLocalizations.of(context)!;
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -170,11 +174,11 @@ class _ProductListScreenState extends State<ProductListScreen> {
           ),
           child: TextField(
             controller: _searchController,
-            decoration: const InputDecoration(
-              hintText: "Search products...",
-              prefixIcon: Icon(Icons.search, color: Colors.grey),
+            decoration: InputDecoration(
+              hintText: l10n.searchHint,
+              prefixIcon: const Icon(Icons.search, color: Colors.grey),
               border: InputBorder.none,
-              contentPadding: EdgeInsets.symmetric(vertical: 10),
+              contentPadding: const EdgeInsets.symmetric(vertical: 10),
             ),
           ),
         ),
@@ -198,7 +202,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
               children: [
                 Icon(Icons.search_off, size: 80, color: Colors.grey.shade300),
                 const SizedBox(height: 10),
-                const Text("No products match your filters", style: TextStyle(color: Colors.grey, fontSize: 16)),
+                Text(l10n.noProductsMatch, style: const TextStyle(color: Colors.grey, fontSize: 16)),
                 TextButton(onPressed: () {
                   setState(() {
                     _selectedCategory = null;
@@ -207,7 +211,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
                     _searchController.clear();
                   });
                   _applyFilters();
-                }, child: const Text("Clear All Filters"))
+                }, child: Text(l10n.clearAllFilters))
               ],
             )))
           else
@@ -234,30 +238,31 @@ class _ProductListScreenState extends State<ProductListScreen> {
   }
 
   Widget _buildFilters() {
+    final l10n = AppLocalizations.of(context)!;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 10),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: Row(
           children: [
-            const Text("Filter:", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.grey)),
+            Text(l10n.filter, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.grey)),
             const SizedBox(width: 8),
             _buildFilterChip(
-              label: _selectedCategory ?? "Category", 
+              label: _selectedCategory ?? l10n.category, 
               icon: Icons.grid_view,
               isActive: _selectedCategory != null,
               onTap: _showCategoryPicker,
             ),
             const SizedBox(width: 8),
             _buildFilterChip(
-              label: _selectedWarehouse ?? "Warehouse", 
+              label: _selectedWarehouse ?? l10n.warehouse, 
               icon: Icons.warehouse,
               isActive: _selectedWarehouse != null,
               onTap: _showWarehousePicker,
             ),
             const SizedBox(width: 8),
             _buildFilterChip(
-              label: "Near Expiry", 
+              label: l10n.nearExpiry,
               icon: Icons.timer_outlined,
               isActive: _isExpiryFilterActive,
               onTap: () {

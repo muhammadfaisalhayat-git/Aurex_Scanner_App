@@ -5,6 +5,7 @@ import 'package:audioplayers/audioplayers.dart';
 import '../services/biometric_service.dart';
 import '../services/firebase_service.dart';
 import '../services/database_service.dart';
+import '../l10n/app_localizations.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -43,11 +44,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     const primaryGreen = Color(0xFF388E3C);
+    final l10n = AppLocalizations.of(context)!;
 
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text("Settings", style: TextStyle(color: Colors.white)),
+        title: Text(l10n.settings, style: const TextStyle(color: Colors.white)),
         backgroundColor: primaryGreen,
         leading: const Icon(Icons.grid_view, color: Colors.white),
       ),
@@ -56,17 +58,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text("Configuration", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-            _buildActionBtn("TEST SCAN BEEP SOUND", Icons.volume_up, _testSound),
+            Text(l10n.configuration, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            _buildActionBtn(l10n.testScanBeep, Icons.volume_up, _testSound),
             
             const Divider(height: 40),
-            const Text("Theme", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-            RadioListTile(title: const Text("System Default"), value: "System Default", groupValue: _selectedTheme, activeColor: primaryGreen, onChanged: (v) => setState(() => _selectedTheme = v!)),
-            RadioListTile(title: const Text("Light"), value: "Light", groupValue: _selectedTheme, activeColor: primaryGreen, onChanged: (v) => setState(() => _selectedTheme = v!)),
-            RadioListTile(title: const Text("Dark"), value: "Dark", groupValue: _selectedTheme, activeColor: primaryGreen, onChanged: (v) => setState(() => _selectedTheme = v!)),
+            Text(l10n.theme, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            RadioListTile(title: Text(l10n.systemDefault), value: "System Default", groupValue: _selectedTheme, activeColor: primaryGreen, onChanged: (v) => setState(() => _selectedTheme = v!)),
+            RadioListTile(title: Text(l10n.light), value: "Light", groupValue: _selectedTheme, activeColor: primaryGreen, onChanged: (v) => setState(() => _selectedTheme = v!)),
+            RadioListTile(title: Text(l10n.dark), value: "Dark", groupValue: _selectedTheme, activeColor: primaryGreen, onChanged: (v) => setState(() => _selectedTheme = v!)),
             
             const Divider(),
-            const Text("Enable Biometric Login", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Text(l10n.enableBiometric, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             SwitchListTile(
               value: _biometricsEnabled,
               activeColor: primaryGreen,
@@ -85,7 +87,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             
             const SizedBox(height: 20),
-            const Text("Account", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            Text(l10n.account, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             Card(
               elevation: 0,
               shape: RoundedRectangleBorder(side: BorderSide(color: Colors.grey.shade200), borderRadius: BorderRadius.circular(10)),
@@ -94,16 +96,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text("Email", style: TextStyle(color: Colors.grey, fontSize: 12)),
+                    Text(l10n.email, style: const TextStyle(color: Colors.grey, fontSize: 12)),
                     Text(user?.email ?? "", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                   ],
                 ),
               ),
             ),
             const SizedBox(height: 20),
-            _buildActionBtn("CLEAN CLOUD BACKUPS", Icons.delete_outline, () {}),
-            _buildActionBtn("BACKUP TO CLOUD (RTDB)", Icons.cloud_upload_outlined, () {}),
-            _buildActionBtn("RESTORE FROM CLOUD (RTDB)", Icons.settings_backup_restore, () {}),
+            _buildActionBtn(l10n.cleanCloudBackups, Icons.delete_outline, () {}),
+            _buildActionBtn(l10n.backupToCloud, Icons.cloud_upload_outlined, () {}),
+            _buildActionBtn(l10n.restoreFromCloudRTDB, Icons.settings_backup_restore, () {}),
           ],
         ),
       ),
