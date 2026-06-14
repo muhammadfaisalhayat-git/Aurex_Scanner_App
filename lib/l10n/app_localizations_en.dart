@@ -222,4 +222,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get biometricSubtitle => 'Use fingerprint to log in next time';
+
+  @override
+  String get category => 'Category';
 }

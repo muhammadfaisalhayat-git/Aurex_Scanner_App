@@ -223,4 +223,7 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get biometricSubtitle =>
       'استخدم بصمة الإصبع لتسجيل الدخول في المرة القادمة';
+
+  @override
+  String get category => 'الفئة';
 }

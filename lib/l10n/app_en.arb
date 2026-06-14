@@ -78,5 +78,6 @@
   "emailAddress": "Email Address",
   "saveChanges": "SAVE CHANGES",
   "profileUpdated": "Profile updated successfully",
-  "biometricSubtitle": "Use fingerprint to log in next time"
+  "biometricSubtitle": "Use fingerprint to log in next time",
+  "category": "Category"
 }

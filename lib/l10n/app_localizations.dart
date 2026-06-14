@@ -517,6 +517,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Use fingerprint to log in next time'**
   String get biometricSubtitle;
+
+  /// No description provided for @category.
+  ///
+  /// In en, this message translates to:
+  /// **'Category'**
+  String get category;
 }
 
 class _AppLocalizationsDelegate
