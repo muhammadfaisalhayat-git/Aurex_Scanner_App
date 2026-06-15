@@ -24,12 +24,12 @@ class NeuralPostProcessor {
     String? expBox;
     String? size;
 
-    // 3. Pairing Logic with High-Precision Spatial Weights
+    // 3. Pairing Logic with Universal Table Pattern Weights
     final List<_Pairing> potentialPairs = [];
     for (var candidate in candidates) {
       for (var anchor in anchors) {
-        final score = _calculateRelationshipScore(anchor, candidate, imageSize);
-        if (score > 0.18) { // Lowered slightly to capture multi-row columnar matches
+        final score = _calculateUniversalRelationshipScore(anchor, candidate, imageSize);
+        if (score > 0.15) {
           potentialPairs.add(_Pairing(anchor, candidate, score));
         }
       }
@@ -97,7 +97,7 @@ class NeuralPostProcessor {
 
   bool _isGenericLabel(String text) {
     final lower = text.toLowerCase().trim();
-    return ["variety", "product", "kind", "crop", "item", "exported", "india", "lot", "treatment"].any((l) => lower.contains(l));
+    return ["variety", "product", "kind", "crop", "item", "exported", "india", "lot", "treatment", "exp", "mfg"].any((l) => lower.contains(l));
   }
 
   List<_Anchor> _identifyAnchors(List<TextBlock> blocks) {
@@ -120,14 +120,8 @@ class NeuralPostProcessor {
   bool _isStrictKeywordMatch(String text, List<String> keywords) {
     for (var k in keywords) {
        final kw = k.toLowerCase();
-       // Multi-word exact or prefix match
-       if (text == kw || text.startsWith("$kw ") || text.startsWith("$kw:") || text.startsWith("$kw.")) {
-         return true;
-       }
-       // Inside multi-line block check
-       if (text.contains("\n$kw") || text.contains("$kw\n")) {
-         return true;
-       }
+       if (text == kw || text.startsWith("$kw ") || text.startsWith("$kw:") || text.startsWith("$kw.")) return true;
+       if (text.contains("\n$kw") || text.contains("$kw\n")) return true;
     }
     return false;
   }
@@ -162,7 +156,7 @@ class NeuralPostProcessor {
     return candidates;
   }
 
-  double _calculateRelationshipScore(_Anchor anchor, _ValueCandidate candidate, Size imgSize) {
+  double _calculateUniversalRelationshipScore(_Anchor anchor, _ValueCandidate candidate, Size imgSize) {
     final aRect = anchor.block.boundingBox;
     final cRect = candidate.boundingBox;
     final cLineText = candidate.fullLineText.toLowerCase();
@@ -175,30 +169,38 @@ class NeuralPostProcessor {
     final double dxNorm = (aCenterX - cCenterX).abs() / imgSize.width;
     final double dyNorm = (aCenterY - cCenterY).abs() / imgSize.height;
     
-    // RULE 1: SELF-CONTAINMENT (Direct Line Match)
+    // PATTERN 1: INLINE (Direct Line Match)
+    // Label and Value are merged into one line by the OCR engine.
     if (candidate.isDate) {
       if (anchor.type == _AnchorType.mfg && _isStrictKeywordMatch(cLineText, TextParser.mfgKeywords)) return 0.99;
       if (anchor.type == _AnchorType.exp && _isStrictKeywordMatch(cLineText, TextParser.expKeywords)) return 0.99;
     }
 
-    // RULE 2: COLUMNAR TABLE MATCH (Anchor on TOP, Value BELOW)
-    // Common in industrial labels (headers on red background)
-    if (cRect.top > aRect.top) {
-       // Check if centers are horizontally aligned (within 15% of width)
-       if ((aCenterX - cCenterX).abs() < aRect.width * 0.4) {
-          // If perfectly vertically stacked, give high score
-          double columnarScore = 0.8 - (dyNorm * 3.0);
-          // Boost if centers are very close
-          if ((aCenterX - cCenterX).abs() < aRect.width * 0.1) columnarScore += 0.15;
+    // PATTERN 2: HORIZONTAL TABLE (Label-Left, Value-Right)
+    // Most common in retail and formal documents.
+    if ((aCenterY - cCenterY).abs() < aRect.height * 1.2) {
+      if (cRect.left > aRect.left) { 
+         double score = 1.0 - (dxNorm * 2.5);
+         // Check for separators like ":" between them
+         return score.clamp(0.0, 1.0); 
+      }
+    }
+
+    // PATTERN 3: COLUMNAR HEADER (Label-Top, Value-Below)
+    // Common in industrial labels and spreadsheets.
+    if (cRect.top > aRect.top && dyNorm < 0.15) {
+       // High boost if horizontally centered with each other
+       if ((aCenterX - cCenterX).abs() < aRect.width * 0.5) {
+          double columnarScore = 0.85 - (dyNorm * 2.0);
+          if ((aCenterX - cCenterX).abs() < aRect.width * 0.15) columnarScore += 0.1;
           return columnarScore.clamp(0.0, 1.0);
        }
     }
 
-    // RULE 3: HORIZONTAL TABLE MATCH (Label on LEFT, Value on RIGHT)
+    // PATTERN 4: ARABIC/RTL TABLE (Value-Left, Label-Right)
+    // Specific for Arabic-first labels.
     if ((aCenterY - cCenterY).abs() < aRect.height * 1.2) {
-      if (cRect.left > aRect.left) { 
-         return (1.0 - (dxNorm * 2.5)).clamp(0.0, 1.0); 
-      } else if (cRect.right < aRect.left) { 
+      if (cRect.right < aRect.left) {
          return (0.95 - (dxNorm * 2.5)).clamp(0.0, 1.0);
       }
     } 
