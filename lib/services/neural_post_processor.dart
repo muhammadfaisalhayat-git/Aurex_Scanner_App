@@ -9,13 +9,14 @@ class NeuralPostProcessor {
   NeuralPostProcessor._internal();
 
   Product refine(RecognizedText rawText, Size imageSize) {
-    final blocks = rawText.blocks;
+    // 1. Pre-process: Split merged lines by whitespace to handle multi-column blocks
+    final List<_StructuralLine> allLines = _extractStructuralLines(rawText);
+
+    // 2. Identify "Anchors" (Labels like MFG, EXP, Name)
+    final anchors = _identifyAnchors(allLines);
     
-    // 1. Identify "Anchors" (Labels like MFG, EXP, Name)
-    final anchors = _identifyAnchors(blocks);
-    
-    // 2. Extract potential values with strict validation
-    final List<_ValueCandidate> candidates = _extractValidatedCandidates(rawText);
+    // 3. Extract potential values with strict validation
+    final List<_ValueCandidate> candidates = _extractValidatedCandidates(allLines);
 
     String? name;
     String? mfgDate;
@@ -24,25 +25,24 @@ class NeuralPostProcessor {
     String? expBox;
     String? size;
 
-    // 3. Pairing Logic with Universal Table Pattern Weights
+    // 4. Structural Table Engine: Global Proximity and Alignment Scoring
     final List<_Pairing> potentialPairs = [];
     for (var candidate in candidates) {
       for (var anchor in anchors) {
-        final score = _calculateUniversalRelationshipScore(anchor, candidate, imageSize);
+        final score = _calculateStructuralScore(anchor, candidate, imageSize);
         if (score > 0.15) {
           potentialPairs.add(_Pairing(anchor, candidate, score));
         }
       }
     }
 
-    // Sort by descending score to pick absolute best matches first
     potentialPairs.sort((a, b) => b.score.compareTo(a.score));
 
     final Set<String> matchedAnchors = {};
     final Set<Rect> matchedCandidates = {};
 
     for (var pair in potentialPairs) {
-      final anchorId = "${pair.anchor.type}_${pair.anchor.block.boundingBox.center}";
+      final anchorId = "${pair.anchor.type}_${pair.anchor.boundingBox.center}";
       final candidateId = pair.candidate.boundingBox;
 
       if (matchedAnchors.contains(anchorId) || matchedCandidates.contains(candidateId)) {
@@ -79,9 +79,9 @@ class NeuralPostProcessor {
       }
     }
 
-    // 4. Enhanced Fallback for Product Name
+    // 5. Fallback for Product Name (Largest clean block in top area)
     if (name == null || name == "Unknown Product" || _isGenericLabel(name)) {
-       name = _smartNameFallback(blocks);
+       name = _smartNameFallback(allLines);
     }
 
     return Product(
@@ -95,23 +95,54 @@ class NeuralPostProcessor {
     );
   }
 
+  /// Splits text lines with large horizontal gaps into separate structural elements.
+  /// This handles OCR "merging" multiple columns into one line.
+  List<_StructuralLine> _extractStructuralLines(RecognizedText raw) {
+    final List<_StructuralLine> structuralLines = [];
+    for (var block in raw.blocks) {
+      for (var line in block.lines) {
+        final text = line.text;
+        // Search for double-spaces or large gaps (indicative of table columns)
+        if (text.contains("  ")) {
+           final parts = text.split(RegExp(r'\s{2,}'));
+           double currentLeft = line.boundingBox.left;
+           final double charWidth = line.boundingBox.width / text.length;
+
+           for (var part in parts) {
+             if (part.trim().isEmpty) {
+                currentLeft += (part.length * charWidth);
+                continue;
+             }
+             final double partWidth = part.length * charWidth;
+             final partRect = Rect.fromLTWH(currentLeft, line.boundingBox.top, partWidth, line.boundingBox.height);
+             structuralLines.add(_StructuralLine(part.trim(), partRect));
+             currentLeft += (part.length * charWidth);
+           }
+        } else {
+          structuralLines.add(_StructuralLine(line.text, line.boundingBox));
+        }
+      }
+    }
+    return structuralLines;
+  }
+
   bool _isGenericLabel(String text) {
     final lower = text.toLowerCase().trim();
     return ["variety", "product", "kind", "crop", "item", "exported", "india", "lot", "treatment", "exp", "mfg"].any((l) => lower.contains(l));
   }
 
-  List<_Anchor> _identifyAnchors(List<TextBlock> blocks) {
+  List<_Anchor> _identifyAnchors(List<_StructuralLine> lines) {
     final List<_Anchor> anchors = [];
-    for (var block in blocks) {
-      final text = block.text.toLowerCase().trim();
+    for (var line in lines) {
+      final text = line.text.toLowerCase().trim();
       if (_isStrictKeywordMatch(text, TextParser.mfgKeywords)) {
-        anchors.add(_Anchor(block, _AnchorType.mfg));
+        anchors.add(_Anchor(line.boundingBox, _AnchorType.mfg, line.text));
       } else if (_isStrictKeywordMatch(text, TextParser.expKeywords)) {
-        anchors.add(_Anchor(block, _AnchorType.exp));
+        anchors.add(_Anchor(line.boundingBox, _AnchorType.exp, line.text));
       } else if (_isStrictKeywordMatch(text, TextParser.nameKeywords)) {
-        anchors.add(_Anchor(block, _AnchorType.name));
+        anchors.add(_Anchor(line.boundingBox, _AnchorType.name, line.text));
       } else if (_isStrictKeywordMatch(text, TextParser.sizeKeywords)) {
-        anchors.add(_Anchor(block, _AnchorType.size));
+        anchors.add(_Anchor(line.boundingBox, _AnchorType.size, line.text));
       }
     }
     return anchors;
@@ -126,38 +157,36 @@ class NeuralPostProcessor {
     return false;
   }
 
-  List<_ValueCandidate> _extractValidatedCandidates(RecognizedText raw) {
+  List<_ValueCandidate> _extractValidatedCandidates(List<_StructuralLine> lines) {
     final List<_ValueCandidate> candidates = [];
-    for (var block in raw.blocks) {
-      for (var line in block.lines) {
-        final text = line.text.trim();
-        if (text.length < 3) continue;
+    for (var line in lines) {
+      final text = line.text.trim();
+      if (text.length < 3) continue;
 
-        bool isDate = false;
-        bool isWeight = false;
-        String val = text;
-        
-        for (var pattern in TextParser.datePatterns) {
-          if (pattern.hasMatch(text)) {
-            isDate = true;
-            val = pattern.firstMatch(text)!.group(0)!;
-            val = TextParser.normalizeDate(val);
-            break;
-          }
+      bool isDate = false;
+      bool isWeight = false;
+      String val = text;
+      
+      for (var pattern in TextParser.datePatterns) {
+        if (pattern.hasMatch(text)) {
+          isDate = true;
+          val = pattern.firstMatch(text)!.group(0)!;
+          val = TextParser.normalizeDate(val);
+          break;
         }
-
-        if (!isDate && TextParser.unitRegex.hasMatch(text)) {
-           isWeight = true;
-        }
-
-        candidates.add(_ValueCandidate(val, line.boundingBox, line.text, isDate, isWeight));
       }
+
+      if (!isDate && TextParser.unitRegex.hasMatch(text)) {
+         isWeight = true;
+      }
+
+      candidates.add(_ValueCandidate(val, line.boundingBox, line.text, isDate, isWeight));
     }
     return candidates;
   }
 
-  double _calculateUniversalRelationshipScore(_Anchor anchor, _ValueCandidate candidate, Size imgSize) {
-    final aRect = anchor.block.boundingBox;
+  double _calculateStructuralScore(_Anchor anchor, _ValueCandidate candidate, Size imgSize) {
+    final aRect = anchor.boundingBox;
     final cRect = candidate.boundingBox;
     final cLineText = candidate.fullLineText.toLowerCase();
 
@@ -170,37 +199,30 @@ class NeuralPostProcessor {
     final double dyNorm = (aCenterY - cCenterY).abs() / imgSize.height;
     
     // PATTERN 1: INLINE (Direct Line Match)
-    // Label and Value are merged into one line by the OCR engine.
     if (candidate.isDate) {
       if (anchor.type == _AnchorType.mfg && _isStrictKeywordMatch(cLineText, TextParser.mfgKeywords)) return 0.99;
       if (anchor.type == _AnchorType.exp && _isStrictKeywordMatch(cLineText, TextParser.expKeywords)) return 0.99;
     }
 
-    // PATTERN 2: HORIZONTAL TABLE (Label-Left, Value-Right)
-    // Most common in retail and formal documents.
-    if ((aCenterY - cCenterY).abs() < aRect.height * 1.2) {
-      if (cRect.left > aRect.left) { 
-         double score = 1.0 - (dxNorm * 2.5);
-         // Check for separators like ":" between them
-         return score.clamp(0.0, 1.0); 
-      }
-    }
-
-    // PATTERN 3: COLUMNAR HEADER (Label-Top, Value-Below)
-    // Common in industrial labels and spreadsheets.
-    if (cRect.top > aRect.top && dyNorm < 0.15) {
-       // High boost if horizontally centered with each other
-       if ((aCenterX - cCenterX).abs() < aRect.width * 0.5) {
-          double columnarScore = 0.85 - (dyNorm * 2.0);
-          if ((aCenterX - cCenterX).abs() < aRect.width * 0.15) columnarScore += 0.1;
-          return columnarScore.clamp(0.0, 1.0);
+    // PATTERN 2: COLUMNAR PROJECTON (Grid Match)
+    // Label on Top, Value Below - Projecting the anchor's column vertically
+    if (cRect.top > aRect.top && dyNorm < 0.25) {
+       // Check if centers are horizontally aligned (within column bounds)
+       final double hOverlap = _calculateHorizontalOverlap(aRect, cRect);
+       if (hOverlap > 0.4 || (aCenterX - cCenterX).abs() < aRect.width * 0.5) {
+          double gridScore = 0.9 - (dyNorm * 2.5);
+          // Boost if centers are very close
+          if ((aCenterX - cCenterX).abs() < aRect.width * 0.2) gridScore += 0.1;
+          return gridScore.clamp(0.0, 1.0);
        }
     }
 
-    // PATTERN 4: ARABIC/RTL TABLE (Value-Left, Label-Right)
-    // Specific for Arabic-first labels.
-    if ((aCenterY - cCenterY).abs() < aRect.height * 1.2) {
-      if (cRect.right < aRect.left) {
+    // PATTERN 3: ROW PROJECTON (Label on Left, Value on Right)
+    if ((aCenterY - cCenterY).abs() < aRect.height * 1.5) {
+      if (cRect.left > aRect.left) { 
+         return (1.0 - (dxNorm * 2.5)).clamp(0.0, 1.0); 
+      } else if (cRect.right < aRect.left) { 
+         // RTL Support
          return (0.95 - (dxNorm * 2.5)).clamp(0.0, 1.0);
       }
     } 
@@ -208,15 +230,24 @@ class NeuralPostProcessor {
     return 0.0;
   }
 
-  String? _smartNameFallback(List<TextBlock> blocks) {
-    if (blocks.isEmpty) return null;
-    final topBlocks = blocks.where((b) => b.boundingBox.top < 500).toList();
-    topBlocks.sort((a, b) => (b.boundingBox.width * b.boundingBox.height).compareTo(a.boundingBox.width * a.boundingBox.height));
+  double _calculateHorizontalOverlap(Rect r1, Rect r2) {
+    final double left = r1.left > r2.left ? r1.left : r2.left;
+    final double right = r1.right < r2.right ? r1.right : r2.right;
+    if (left >= right) return 0.0;
+    final double overlapWidth = right - left;
+    final double minWidth = r1.width < r2.width ? r1.width : r2.width;
+    return overlapWidth / minWidth;
+  }
+
+  String? _smartNameFallback(List<_StructuralLine> lines) {
+    if (lines.isEmpty) return null;
+    final topLines = lines.where((l) => l.boundingBox.top < 500).toList();
+    topLines.sort((a, b) => (b.boundingBox.width * b.boundingBox.height).compareTo(a.boundingBox.width * a.boundingBox.height));
     
-    for (var b in topBlocks) {
-       final t = b.text.toLowerCase().trim();
+    for (var l in topLines) {
+       final t = l.text.toLowerCase().trim();
        if (t.length > 3 && !TextParser.isMetadataBlock(t) && !_isGenericLabel(t)) {
-         return b.text.split('\n').first.trim();
+         return l.text.split('\n').first.trim();
        }
     }
     return null;
@@ -225,10 +256,17 @@ class NeuralPostProcessor {
 
 enum _AnchorType { mfg, exp, name, size }
 
+class _StructuralLine {
+  final String text;
+  final Rect boundingBox;
+  _StructuralLine(this.text, this.boundingBox);
+}
+
 class _Anchor {
-  final TextBlock block;
+  final Rect boundingBox;
   final _AnchorType type;
-  _Anchor(this.block, this.type);
+  final String text;
+  _Anchor(this.boundingBox, this.type, this.text);
 }
 
 class _ValueCandidate {
