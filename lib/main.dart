@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'services/database_service.dart';
 import 'services/firebase_service.dart';
 import 'services/locale_provider.dart';
+import 'services/theme_provider.dart';
 import 'services/learning_service.dart';
 import 'services/notification_service.dart';
 import 'services/background_service.dart';
@@ -32,6 +33,7 @@ void main() async {
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => LocaleProvider()),
+        ChangeNotifierProvider(create: (_) => ThemeProvider()),
         Provider(create: (_) => DatabaseService()),
         Provider(create: (_) => FirebaseService()),
       ],
@@ -46,6 +48,7 @@ class AurexApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final localeProvider = Provider.of<LocaleProvider>(context);
+    final themeProvider = Provider.of<ThemeProvider>(context);
 
     return MaterialApp(
       debugShowCheckedModeBanner: false,
@@ -53,7 +56,14 @@ class AurexApp extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.green,
         useMaterial3: true,
+        brightness: Brightness.light,
       ),
+      darkTheme: ThemeData(
+        primarySwatch: Colors.green,
+        useMaterial3: true,
+        brightness: Brightness.dark,
+      ),
+      themeMode: themeProvider.themeMode,
       locale: localeProvider.locale,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
