@@ -37,10 +37,22 @@ class DatabaseService {
 
   Future<void> insertProduct(Product product) async {
     final db = await database;
-    await db.insert(
+    final int id = await db.insert(
       'products',
       product.toMap(),
       conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+    product.id = id;
+  }
+
+  Future<void> updateProduct(Product product) async {
+    final db = await database;
+    if (product.id == null) return;
+    await db.update(
+      'products',
+      product.toMap(),
+      where: 'id = ?',
+      whereArgs: [product.id],
     );
   }
 
