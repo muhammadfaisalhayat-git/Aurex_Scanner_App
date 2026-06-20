@@ -18,7 +18,6 @@ class ResultScreen extends StatefulWidget {
 }
 
 class _ResultScreenState extends State<ResultScreen> {
-  bool _isEditing = false;
   late TextEditingController _nameController;
   late TextEditingController _codeController;
   late TextEditingController _mfgController;
@@ -39,8 +38,6 @@ class _ResultScreenState extends State<ResultScreen> {
     _sizeController = TextEditingController(text: widget.product.size);
     _selectedCategory = widget.product.category ?? "General";
     _warehouseController = TextEditingController(text: widget.product.warehouseName);
-    
-    if (widget.product.id == null) _isEditing = true;
   }
 
   Future<void> _save() async {
@@ -57,10 +54,7 @@ class _ResultScreenState extends State<ResultScreen> {
     p.warehouseName = _warehouseController.text;
 
     try {
-      // 1. Core Logic: Self-Learning from this entry
       await LearningService().learnLayout(p);
-
-      // 2. Persist to Database & Cloud
       await Provider.of<DatabaseService>(context, listen: false).insertProduct(p);
       await Provider.of<FirebaseService>(context, listen: false).backupAll([p]);
       
@@ -78,14 +72,19 @@ class _ResultScreenState extends State<ResultScreen> {
 
   @override
   Widget build(BuildContext context) {
-    const primaryGreen = Color(0xFF388E3C);
+    final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
+    final isDark = theme.brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text(l10n.productDetails, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        backgroundColor: primaryGreen,
-        leading: const Icon(Icons.grid_view, color: Colors.white),
+        backgroundColor: theme.colorScheme.primary,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
         actions: [IconButton(icon: const Icon(Icons.notifications, color: Colors.white), onPressed: () {})],
       ),
       body: SingleChildScrollView(
@@ -99,13 +98,13 @@ class _ResultScreenState extends State<ResultScreen> {
             )
           else
             Container(
-              height: 220, width: double.infinity, color: Colors.grey.shade200,
+              height: 220, width: double.infinity, color: isDark ? Colors.grey.shade900 : Colors.grey.shade200,
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.image_not_supported, size: 60, color: Colors.grey),
+                  Icon(Icons.image_not_supported, size: 60, color: isDark ? Colors.white24 : Colors.grey),
                   const SizedBox(height: 10),
-                  Text(l10n.noImageAvailable, style: const TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+                  Text(l10n.noImageAvailable, style: TextStyle(color: isDark ? Colors.white38 : Colors.grey, fontWeight: FontWeight.bold)),
                 ],
               ),
             ),
@@ -124,10 +123,16 @@ class _ResultScreenState extends State<ResultScreen> {
               Container(
                 width: double.infinity, margin: const EdgeInsets.only(bottom: 15),
                 padding: const EdgeInsets.symmetric(horizontal: 12),
-                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.grey.shade300)),
+                decoration: BoxDecoration(
+                  color: theme.cardColor, 
+                  borderRadius: BorderRadius.circular(8), 
+                  border: Border.all(color: isDark ? Colors.grey.shade800 : Colors.grey.shade300)
+                ),
                 child: DropdownButtonHideUnderline(
                   child: DropdownButton<String>(
                     value: _selectedCategory,
+                    dropdownColor: theme.cardColor,
+                    style: TextStyle(color: isDark ? Colors.white : Colors.black, fontSize: 16),
                     items: ["General", "Seeds", "Fertilizer", "Tools"].map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
                     onChanged: (v) => setState(() => _selectedCategory = v!),
                   ),
@@ -140,7 +145,10 @@ class _ResultScreenState extends State<ResultScreen> {
               
               const SizedBox(height: 20),
               SizedBox(width: double.infinity, height: 60, child: ElevatedButton(
-                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF5E7D6A), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: theme.colorScheme.primary, 
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))
+                ),
                 onPressed: _save, child: Text(l10n.updateProduct.toUpperCase(), style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
               )),
             ]),
@@ -151,15 +159,24 @@ class _ResultScreenState extends State<ResultScreen> {
   }
 
   Widget _buildField(String lbl, TextEditingController ctrl, {bool isAr = false}) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(color: Colors.grey.shade200, borderRadius: BorderRadius.circular(8)),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.grey.shade900 : Colors.grey.shade200, 
+        borderRadius: BorderRadius.circular(8)
+      ),
       child: TextField(
-        controller: ctrl, textAlign: isAr ? TextAlign.right : TextAlign.left,
+        controller: ctrl, 
+        textAlign: isAr ? TextAlign.right : TextAlign.left,
+        style: TextStyle(color: isDark ? Colors.white : Colors.black),
         decoration: InputDecoration(
-          labelText: lbl, labelStyle: const TextStyle(color: Colors.grey, fontSize: 14),
+          labelText: lbl, 
+          labelStyle: TextStyle(color: isDark ? Colors.grey : Colors.grey, fontSize: 14),
           suffixIcon: IconButton(
-            icon: const Icon(Icons.qr_code_scanner, color: Colors.grey), 
+            icon: Icon(Icons.qr_code_scanner, color: isDark ? Colors.grey : Colors.grey), 
             onPressed: () async {
               final result = await Navigator.push(
                 context,
@@ -172,7 +189,8 @@ class _ResultScreenState extends State<ResultScreen> {
               }
             }
           ),
-          border: InputBorder.none, contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          border: InputBorder.none, 
+          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         ),
       ),
     );

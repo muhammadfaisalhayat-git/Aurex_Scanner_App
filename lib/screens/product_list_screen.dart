@@ -90,26 +90,29 @@ class _ProductListScreenState extends State<ProductListScreen> {
     
     showModalBottomSheet(
       context: context,
-      builder: (context) => ListView(
-        shrinkWrap: true,
-        children: [
-          ListTile(
-            title: Text(l10n.allCategories, style: const TextStyle(fontWeight: FontWeight.bold)),
-            onTap: () {
-              setState(() => _selectedCategory = null);
-              _applyFilters();
-              Navigator.pop(context);
-            },
-          ),
-          ...categories.map((c) => ListTile(
-            title: Text(c),
-            onTap: () {
-              setState(() => _selectedCategory = c);
-              _applyFilters();
-              Navigator.pop(context);
-            },
-          )),
-        ],
+      builder: (context) => Container(
+        color: Theme.of(context).cardColor,
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            ListTile(
+              title: Text(l10n.allCategories, style: const TextStyle(fontWeight: FontWeight.bold)),
+              onTap: () {
+                setState(() => _selectedCategory = null);
+                _applyFilters();
+                Navigator.pop(context);
+              },
+            ),
+            ...categories.map((c) => ListTile(
+              title: Text(c),
+              onTap: () {
+                setState(() => _selectedCategory = c);
+                _applyFilters();
+                Navigator.pop(context);
+              },
+            )),
+          ],
+        ),
       ),
     );
   }
@@ -129,54 +132,60 @@ class _ProductListScreenState extends State<ProductListScreen> {
 
     showModalBottomSheet(
       context: context,
-      builder: (context) => ListView(
-        shrinkWrap: true,
-        children: [
-          ListTile(
-            title: Text(l10n.allWarehouses, style: const TextStyle(fontWeight: FontWeight.bold)),
-            onTap: () {
-              setState(() => _selectedWarehouse = null);
-              _applyFilters();
-              Navigator.pop(context);
-            },
-          ),
-          ...warehouses.map((w) => ListTile(
-            title: Text(w),
-            onTap: () {
-              setState(() => _selectedWarehouse = w);
-              _applyFilters();
-              Navigator.pop(context);
-            },
-          )),
-        ],
+      builder: (context) => Container(
+        color: Theme.of(context).cardColor,
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            ListTile(
+              title: Text(l10n.allWarehouses, style: const TextStyle(fontWeight: FontWeight.bold)),
+              onTap: () {
+                setState(() => _selectedWarehouse = null);
+                _applyFilters();
+                Navigator.pop(context);
+              },
+            ),
+            ...warehouses.map((w) => ListTile(
+              title: Text(w),
+              onTap: () {
+                setState(() => _selectedWarehouse = w);
+                _applyFilters();
+                Navigator.pop(context);
+              },
+            )),
+          ],
+        ),
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    const primaryGreen = Color(0xFF388E3C);
+    final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
+    final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 1,
+        backgroundColor: theme.scaffoldBackgroundColor,
+        elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: primaryGreen, size: 30),
+          icon: Icon(Icons.arrow_back, color: theme.colorScheme.primary, size: 30),
           onPressed: () => Navigator.pop(context),
         ),
         title: Container(
           decoration: BoxDecoration(
-            color: Colors.grey.shade100,
+            color: isDark ? Colors.grey.shade900 : Colors.grey.shade100,
             borderRadius: BorderRadius.circular(15),
           ),
           child: TextField(
             controller: _searchController,
+            style: TextStyle(color: isDark ? Colors.white : Colors.black),
             decoration: InputDecoration(
               hintText: l10n.searchHint,
-              prefixIcon: const Icon(Icons.search, color: Colors.grey),
+              hintStyle: TextStyle(color: isDark ? Colors.grey : Colors.grey),
+              prefixIcon: Icon(Icons.search, color: isDark ? Colors.grey : Colors.grey),
               border: InputBorder.none,
               contentPadding: const EdgeInsets.symmetric(vertical: 10),
             ),
@@ -185,7 +194,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
         actions: [
           IconButton(
             onPressed: _loadProducts, 
-            icon: const Icon(Icons.refresh, color: primaryGreen)
+            icon: Icon(Icons.refresh, color: theme.colorScheme.primary)
           ),
         ],
       ),
@@ -200,7 +209,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
             Expanded(child: Center(child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.search_off, size: 80, color: Colors.grey.shade300),
+                Icon(Icons.search_off, size: 80, color: isDark ? Colors.grey.shade800 : Colors.grey.shade300),
                 const SizedBox(height: 10),
                 Text(l10n.noProductsMatch, style: const TextStyle(color: Colors.grey, fontSize: 16)),
                 TextButton(onPressed: () {
@@ -282,35 +291,39 @@ class _ProductListScreenState extends State<ProductListScreen> {
     required bool isActive,
     required VoidCallback onTap,
   }) {
-    final primaryGreen = const Color(0xFF388E3C);
+    final theme = Theme.of(context);
+    final primary = theme.colorScheme.primary;
+    final isDark = theme.brightness == Brightness.dark;
     
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: isActive ? primaryGreen.withOpacity(0.1) : Colors.grey.shade100,
+          color: isActive 
+              ? primary.withOpacity(0.2) 
+              : (isDark ? Colors.grey.shade900 : Colors.grey.shade100),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isActive ? primaryGreen : Colors.grey.shade300,
+            color: isActive ? primary : (isDark ? Colors.grey.shade800 : Colors.grey.shade300),
             width: 1,
           ),
         ),
         child: Row(
           children: [
-            Icon(icon, size: 16, color: isActive ? primaryGreen : Colors.grey.shade700),
+            Icon(icon, size: 16, color: isActive ? primary : Colors.grey.shade600),
             const SizedBox(width: 6),
             Text(
               label, 
               style: TextStyle(
                 fontSize: 13, 
                 fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
-                color: isActive ? primaryGreen : Colors.black87,
+                color: isActive ? primary : (isDark ? Colors.white70 : Colors.black87),
               )
             ),
             if (isActive) ...[
               const SizedBox(width: 4),
-              const Icon(Icons.keyboard_arrow_down, size: 14, color: Color(0xFF388E3C)),
+              Icon(Icons.keyboard_arrow_down, size: 14, color: primary),
             ]
           ],
         ),

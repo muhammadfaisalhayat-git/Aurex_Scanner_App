@@ -22,23 +22,23 @@ class AppDrawer extends StatefulWidget {
 class _AppDrawerState extends State<AppDrawer> {
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final user = FirebaseAuth.instance.currentUser;
-    final firebaseService = Provider.of<FirebaseService>(context, listen: false);
-    final dbService = Provider.of<DatabaseService>(context, listen: false);
     final localeProvider = Provider.of<LocaleProvider>(context);
     final l10n = AppLocalizations.of(context)!;
     
-    const primaryGreen = Color(0xFF388E3C);
-    const itemBgColor = Color(0xFFF1F8E9);
+    final primary = theme.colorScheme.primary;
+    final itemBgColor = isDark ? Colors.grey.shade900 : const Color(0xFFF1F8E9);
     final isAr = localeProvider.locale.languageCode == 'ar';
 
     return Drawer(
-      backgroundColor: Colors.white,
+      backgroundColor: theme.scaffoldBackgroundColor,
       child: Column(
         children: [
           Container(
             width: double.infinity,
-            color: primaryGreen,
+            color: isDark ? theme.colorScheme.surface : primary,
             padding: const EdgeInsets.only(top: 50, bottom: 30),
             child: Column(
               children: [
@@ -56,7 +56,7 @@ class _AppDrawerState extends State<AppDrawer> {
                   child: Image.asset(
                     'assets/logos/bin_awf_logo.png',
                     height: 90,
-                    errorBuilder: (context, error, stackTrace) => const Icon(Icons.eco, color: primaryGreen, size: 60),
+                    errorBuilder: (context, error, stackTrace) => Icon(Icons.eco, color: primary, size: 60),
                   ),
                 ),
                 const SizedBox(height: 25),
@@ -88,28 +88,24 @@ class _AppDrawerState extends State<AppDrawer> {
                 }, itemBgColor),
                 
                 _buildDrawerItem(context, Icons.save_outlined, l10n.backupToServer, () async {
-                  final fs = Provider.of<FirebaseService>(context, listen: false);
                   final ds = Provider.of<DatabaseService>(context, listen: false);
-                  
-                  Navigator.pop(context); // Close drawer
-                  
+                  Navigator.pop(context); 
                   final products = await ds.getProducts();
                   if (products.isEmpty) {
                     if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(l10n.noProductsFound)));
                     return;
                   }
-                  
                   _showGlobalProgressDialog(context, l10n.backupToServer, l10n.backupToServer, (onProgressUpdate) async {
+                    final fs = Provider.of<FirebaseService>(context, listen: false);
                     await fs.backupAll(products, onProgress: (current, total) => onProgressUpdate(current, total));
                     return true;
                   });
                 }, itemBgColor),
                 
                 _buildDrawerItem(context, Icons.download_outlined, l10n.restoreFromCloud, () {
-                  final fs = Provider.of<FirebaseService>(context, listen: false);
-                  Navigator.pop(context); // Close drawer
-                  
+                  Navigator.pop(context); 
                   _showGlobalProgressDialog(context, l10n.restoreFromCloud, l10n.restoreFromCloud, (onProgressUpdate) async {
+                    final fs = Provider.of<FirebaseService>(context, listen: false);
                     int? count = await fs.restoreAll(onProgress: (current, total) => onProgressUpdate(current, total));
                     return count;
                   });
@@ -124,7 +120,7 @@ class _AppDrawerState extends State<AppDrawer> {
                 
                 Padding(
                   padding: const EdgeInsets.only(left: 8.0, top: 25, bottom: 10),
-                  child: Text(l10n.account, style: const TextStyle(color: Colors.grey, fontSize: 16)),
+                  child: Text(l10n.account, style: TextStyle(color: isDark ? Colors.white54 : Colors.grey, fontSize: 16)),
                 ),
                 
                 _buildDrawerItem(context, Icons.power_settings_new, l10n.logout, () async {
@@ -144,8 +140,8 @@ class _AppDrawerState extends State<AppDrawer> {
           Padding(
             padding: const EdgeInsets.only(bottom: 20),
             child: Text(
-              l10n.versionEdition,
-              style: const TextStyle(color: Colors.grey, fontSize: 12)
+              l10n.versionEdition, 
+              style: TextStyle(color: isDark ? Colors.white24 : Colors.grey, fontSize: 12)
             ),
           ),
         ],
@@ -154,15 +150,19 @@ class _AppDrawerState extends State<AppDrawer> {
   }
 
   Widget _buildDrawerItem(BuildContext context, IconData icon, String title, VoidCallback onTap, Color bgColor, {Color iconColor = const Color(0xFF388E3C)}) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
         color: bgColor,
         borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: isDark ? Colors.grey.shade800 : Colors.transparent),
       ),
       child: ListTile(
-        leading: Icon(icon, color: iconColor, size: 28),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        leading: Icon(icon, color: isDark ? theme.colorScheme.primary : iconColor, size: 28),
+        title: Text(title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: isDark ? Colors.white : Colors.black87)),
         onTap: onTap,
         dense: false,
       ),
@@ -173,8 +173,6 @@ class _AppDrawerState extends State<AppDrawer> {
     final progressNotifier = ValueNotifier<double>(0);
     final statusNotifier = ValueNotifier<String>("Connecting...");
     bool isDialogVisible = true;
-    
-    // Capture root navigator BEFORE drawer is closed or context becomes unmounted
     final NavigatorState rootNavigator = Navigator.of(context, rootNavigator: true);
 
     showDialog(
@@ -192,21 +190,13 @@ class _AppDrawerState extends State<AppDrawer> {
                 builder: (context, value, child) => LinearProgressIndicator(
                   value: (value > 0 && value < 1.0) ? value : (value >= 1.0 ? 1.0 : null),
                   backgroundColor: Colors.grey[200],
-                  valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF388E3C)),
+                  valueColor: AlwaysStoppedAnimation<Color>(Theme.of(context).colorScheme.primary),
                 ),
               ),
               const SizedBox(height: 20),
               ValueListenableBuilder<String>(
                 valueListenable: statusNotifier,
                 builder: (context, status, child) => Text(status, style: const TextStyle(fontWeight: FontWeight.bold)),
-              ),
-              const SizedBox(height: 20),
-              TextButton(
-                onPressed: () { 
-                   isDialogVisible = false;
-                   Navigator.of(dialogContext).pop(); 
-                },
-                child: const Text("RUN IN BACKGROUND"),
               ),
             ],
           ),
@@ -224,16 +214,7 @@ class _AppDrawerState extends State<AppDrawer> {
         });
         
         await Future.delayed(const Duration(milliseconds: 600));
-
-        // 1. Close progress dialog using the CAPTURED root navigator
-        if (isDialogVisible) {
-          rootNavigator.pop();
-          isDialogVisible = false;
-        }
-        
-        // 2. Show Success Popup (Informing the user)
-        // Use a small delay to ensure the previous pop finished
-        await Future.delayed(const Duration(milliseconds: 200));
+        if (isDialogVisible) { rootNavigator.pop(); isDialogVisible = false; }
         
         showDialog(
           context: rootNavigator.context,
@@ -245,24 +226,15 @@ class _AppDrawerState extends State<AppDrawer> {
                 Text("$actionType Complete"),
               ],
             ),
-            content: Text(result is int ? "Successfully restored $result products." : "Task completed successfully."),
-            actions: [
-              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("OK")),
-            ],
+            content: Text(result is int ? "Successfully processed $result items." : "Task completed successfully."),
+            actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("OK"))],
           ),
         );
       } catch (e) {
-        if (isDialogVisible) {
-          rootNavigator.pop();
-          isDialogVisible = false;
-        }
+        if (isDialogVisible) { rootNavigator.pop(); isDialogVisible = false; }
         showDialog(
           context: rootNavigator.context,
-          builder: (ctx) => AlertDialog(
-            title: const Text("Error"),
-            content: Text(e.toString()),
-            actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("OK"))],
-          ),
+          builder: (ctx) => AlertDialog(title: const Text("Error"), content: Text(e.toString()), actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("OK"))]),
         );
       }
     });

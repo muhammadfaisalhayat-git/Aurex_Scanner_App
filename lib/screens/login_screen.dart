@@ -98,12 +98,14 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final localeProvider = Provider.of<LocaleProvider>(context);
     final l10n = AppLocalizations.of(context)!;
-    const primaryGreen = Color(0xFF5EBA61); // Bright green from the screenshot
+    final primary = theme.colorScheme.primary;
+    final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 32.0),
@@ -118,7 +120,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     onPressed: () => localeProvider.toggleLocale(),
                     child: Text(
                       localeProvider.locale.languageCode == 'ar' ? "English" : "العربية",
-                      style: const TextStyle(color: primaryGreen, fontWeight: FontWeight.bold, fontSize: 16),
+                      style: TextStyle(color: primary, fontWeight: FontWeight.bold, fontSize: 16),
                     ),
                   ),
                 ),
@@ -128,29 +130,30 @@ class _LoginScreenState extends State<LoginScreen> {
                 Image.asset(
                   'assets/logos/app_icon.png',
                   height: 120,
-                  errorBuilder: (context, error, stackTrace) => const Icon(Icons.change_history, size: 100, color: Colors.red),
+                  errorBuilder: (context, error, stackTrace) => Icon(Icons.change_history, size: 100, color: primary),
                 ),
                 const SizedBox(height: 20),
                 
                 // Brand Name
                 Text(
                   l10n.appTitle,
-                  style: const TextStyle(fontSize: 34, fontWeight: FontWeight.w900, color: Color(0xFF333333)),
+                  style: TextStyle(fontSize: 34, fontWeight: FontWeight.w900, color: isDark ? Colors.white : const Color(0xFF333333)),
                 ),
                 Text(
                   l10n.tagline,
-                  style: const TextStyle(fontSize: 16, color: Colors.grey),
+                  style: TextStyle(fontSize: 16, color: isDark ? Colors.white54 : Colors.grey),
                 ),
                 const SizedBox(height: 50),
                 
                 // Email Field
                 TextFormField(
                   controller: _emailController,
+                  style: TextStyle(color: isDark ? Colors.white : Colors.black),
                   decoration: InputDecoration(
                     hintText: l10n.email,
                     hintStyle: const TextStyle(color: Colors.grey, fontSize: 18),
-                    enabledBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Colors.grey)),
-                    focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: primaryGreen, width: 2)),
+                    enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: isDark ? Colors.grey.shade800 : Colors.grey)),
+                    focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: primary, width: 2)),
                   ),
                   validator: (value) => (value == null || !value.contains('@')) ? 'Invalid email' : null,
                 ),
@@ -160,11 +163,12 @@ class _LoginScreenState extends State<LoginScreen> {
                 TextFormField(
                   controller: _passwordController,
                   obscureText: true,
+                  style: TextStyle(color: isDark ? Colors.white : Colors.black),
                   decoration: InputDecoration(
                     hintText: l10n.password,
                     hintStyle: const TextStyle(color: Colors.grey, fontSize: 18),
-                    enabledBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Colors.grey)),
-                    focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: primaryGreen, width: 2)),
+                    enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: isDark ? Colors.grey.shade800 : Colors.grey)),
+                    focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: primary, width: 2)),
                   ),
                   validator: (value) => (value == null || value.length < 6) ? 'Password too short' : null,
                 ),
@@ -175,10 +179,10 @@ class _LoginScreenState extends State<LoginScreen> {
                   children: [
                     Checkbox(
                       value: _rememberMe,
-                      activeColor: primaryGreen,
+                      activeColor: primary,
                       onChanged: (val) => setState(() => _rememberMe = val!),
                     ),
-                    Text(l10n.rememberMe, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
+                    Text(l10n.rememberMe, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: isDark ? Colors.white70 : Colors.black)),
                   ],
                 ),
                 const SizedBox(height: 30),
@@ -190,7 +194,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   child: ElevatedButton(
                     onPressed: _isLoading ? null : _login,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: primaryGreen,
+                      backgroundColor: primary,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
                       elevation: 2,
                     ),
@@ -207,18 +211,18 @@ class _LoginScreenState extends State<LoginScreen> {
                     onTap: _loginWithBiometrics,
                     child: Container(
                       padding: const EdgeInsets.all(12),
-                      decoration: const BoxDecoration(
-                        color: primaryGreen,
+                      decoration: BoxDecoration(
+                        color: primary,
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.face, color: Colors.white, size: 40), // Or Icons.fingerprint
+                      child: const Icon(Icons.face, color: Colors.white, size: 40), 
                     ),
                   )
                 else
                    Container(
                     padding: const EdgeInsets.all(12),
-                    decoration: const BoxDecoration(
-                      color: primaryGreen,
+                    decoration: BoxDecoration(
+                      color: primary,
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(Icons.face, color: Colors.white, size: 40),
@@ -235,11 +239,11 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 TextButton(
                   onPressed: () {},
-                  child: Text(l10n.forgotPassword, style: const TextStyle(color: primaryGreen, fontSize: 16)),
+                  child: Text(l10n.forgotPassword, style: TextStyle(color: primary, fontSize: 16)),
                 ),
                 
                 const SizedBox(height: 20),
-                const Divider(color: Colors.grey),
+                Divider(color: isDark ? Colors.grey.shade800 : Colors.grey),
                 const SizedBox(height: 20),
                 
                 // Google Login
@@ -249,7 +253,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   child: OutlinedButton(
                     onPressed: () {},
                     style: OutlinedButton.styleFrom(
-                      side: BorderSide(color: Colors.grey.shade300),
+                      side: BorderSide(color: isDark ? Colors.grey.shade800 : Colors.grey.shade300),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
                     ),
                     child: Text(

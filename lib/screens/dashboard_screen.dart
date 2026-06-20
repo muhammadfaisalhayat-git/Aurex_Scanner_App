@@ -34,25 +34,24 @@ class DashboardScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const primaryGreen = Color(0xFF388E3C);
-    const secondaryGreen = Color(0xFF2E7D32);
+    final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
+    final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: Text(l10n.appTitle, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w400)),
-        backgroundColor: primaryGreen,
+        title: Text(l10n.appTitle, style: const TextStyle(fontWeight: FontWeight.w400)),
         leading: Builder(
           builder: (context) => IconButton(
-            icon: const Icon(Icons.menu, color: Colors.white),
+            icon: const Icon(Icons.menu),
             onPressed: () => Scaffold.of(context).openDrawer(),
           ),
         ),
         actions: [
           IconButton(
             onPressed: () {},
-            icon: const Icon(Icons.home, color: Colors.white),
+            icon: const Icon(Icons.home),
           ),
           FutureBuilder<int>(
             future: _getNearExpiryCount(context),
@@ -68,7 +67,7 @@ class DashboardScreen extends StatelessWidget {
                         MaterialPageRoute(builder: (context) => const NearExpiryScreen()),
                       );
                     },
-                    icon: const Icon(Icons.notifications, color: Colors.white),
+                    icon: const Icon(Icons.notifications),
                   ),
                   if (count > 0)
                     Positioned(
@@ -101,10 +100,10 @@ class DashboardScreen extends StatelessWidget {
             const SizedBox(height: 10),
             Text(
               l10n.companyName,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 32,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF333333),
+                color: isDark ? Colors.white : const Color(0xFF333333),
               ),
             ),
             const SizedBox(height: 15),
@@ -112,15 +111,16 @@ class DashboardScreen extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 20.0),
               child: Container(
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: theme.cardColor,
                   borderRadius: BorderRadius.circular(15),
-                  border: Border.all(color: Colors.grey.shade300),
+                  border: Border.all(color: isDark ? Colors.grey.shade800 : Colors.grey.shade300),
                 ),
                 child: TextField(
+                  style: TextStyle(color: isDark ? Colors.white : Colors.black),
                   decoration: InputDecoration(
                     hintText: l10n.searchHint,
-                    hintStyle: const TextStyle(color: Colors.grey, fontSize: 18),
-                    prefixIcon: const Icon(Icons.search, color: Colors.grey, size: 28),
+                    hintStyle: TextStyle(color: isDark ? Colors.grey : Colors.grey, fontSize: 18),
+                    prefixIcon: Icon(Icons.search, color: isDark ? Colors.grey : Colors.grey, size: 28),
                     border: InputBorder.none,
                     contentPadding: const EdgeInsets.symmetric(vertical: 15),
                   ),
@@ -132,17 +132,17 @@ class DashboardScreen extends StatelessWidget {
               'assets/logos/bin_awf_logo.png',
               height: 200,
               fit: BoxFit.contain,
-              errorBuilder: (context, error, stackTrace) => const Icon(
+              errorBuilder: (context, error, stackTrace) => Icon(
                 Icons.eco,
                 size: 150,
-                color: secondaryGreen,
+                color: theme.colorScheme.secondary,
               ),
             ),
             const SizedBox(height: 60),
             
             ActionButton(
               text: l10n.scanProduct,
-              color: secondaryGreen,
+              color: theme.colorScheme.primary,
               onPressed: () {
                 Navigator.push(
                   context,
@@ -152,7 +152,7 @@ class DashboardScreen extends StatelessWidget {
             ),
             ActionButton(
               text: l10n.adminDashboard,
-              color: const Color(0xFF607D8B),
+              color: isDark ? Colors.blueGrey.shade700 : const Color(0xFF607D8B),
               onPressed: () {
                 Navigator.push(
                   context,
@@ -162,7 +162,7 @@ class DashboardScreen extends StatelessWidget {
             ),
             ActionButton(
               text: l10n.nearExpiryProducts,
-              color: const Color(0xFFFFA000),
+              color: isDark ? Colors.orange.shade800 : const Color(0xFFFFA000),
               onPressed: () {
                 Navigator.push(
                   context,
@@ -185,13 +185,13 @@ class DashboardScreen extends StatelessWidget {
                     );
                   },
                   style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: secondaryGreen, width: 1),
+                    side: BorderSide(color: theme.colorScheme.secondary, width: 1),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   ),
                   child: Text(
                     l10n.productList,
-                    style: const TextStyle(
-                      color: secondaryGreen,
+                    style: TextStyle(
+                      color: theme.colorScheme.secondary,
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                       letterSpacing: 1.2,
@@ -204,7 +204,7 @@ class DashboardScreen extends StatelessWidget {
             const SizedBox(height: 10),
             Text(
               l10n.projectOf,
-              style: const TextStyle(color: Colors.grey, fontSize: 14),
+              style: TextStyle(color: isDark ? Colors.white54 : Colors.grey, fontSize: 14),
             ),
             const SizedBox(height: 20),
           ],
