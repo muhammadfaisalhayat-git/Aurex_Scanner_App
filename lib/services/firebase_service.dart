@@ -46,31 +46,28 @@ class FirebaseService {
       String key = product.productCode.replaceAll(RegExp(r'[.#$\[\]/]'), '_');
       if (key.isEmpty) key = "ID_${product.id}_${DateTime.now().millisecondsSinceEpoch}";
       
-      bool imageUploaded = true;
+      bool allImagesUploaded = true;
 
-      if (product.imagePath != null) {
-        final File imageFile = File(product.imagePath!);
+      // Handle multiple images
+      for (int imgIndex = 0; imgIndex < product.imagePaths.length; imgIndex++) {
+        final path = product.imagePaths[imgIndex];
+        final File imageFile = File(path);
         if (imageFile.existsSync()) {
           try {
-            final String fileName = "$key.jpg";
+            final String fileName = "${key}_$imgIndex.jpg";
             await _storageRef.child(fileName).putFile(imageFile).timeout(const Duration(seconds: 30));
             debugPrint("Backup: Successfully uploaded image $fileName");
           } catch (e) {
-            imageUploaded = false;
-            debugPrint("Backup: Storage upload FAILED for $key: $e");
+            allImagesUploaded = false;
+            debugPrint("Backup: Storage upload FAILED for $key (img $imgIndex): $e");
           }
-        } else {
-           debugPrint("Backup: Image file not found locally at ${product.imagePath}");
-           // We don't mark as failed if the file literally doesn't exist anymore, 
-           // but we should probably update the DB to null.
         }
       }
 
-      if (imageUploaded) {
+      if (allImagesUploaded) {
         product.isSynced = true;
         final productMap = product.toMap();
-        // Don't store absolute local paths in the cloud
-        productMap['imagePath'] = null; 
+        // The imagePaths are stored as a JSON string in toMap
         updates[key] = productMap;
       }
       
@@ -80,7 +77,6 @@ class FirebaseService {
     
     if (updates.isNotEmpty) {
       await _productRef.update(updates).timeout(const Duration(seconds: 20));
-      // Update local isSynced status
       final ds = DatabaseService();
       for (var p in products) {
         if (p.isSynced) await ds.updateProduct(p);
@@ -113,38 +109,45 @@ class FirebaseService {
       try {
         final productData = Map<String, dynamic>.from(entry.value as Map);
         final String entryKey = entry.key.toString();
-        final String localImagePath = p.join(imagesPath, "$entryKey.jpg");
-        final File localFile = File(localImagePath);
+        
+        // Handle multiple images from cloud
+        List<String> localPaths = [];
+        
+        // We attempt to download images based on a standard naming convention
+        // since we don't know the exact count in advance easily without storing metadata,
+        // or we can store the count.
+        // Actually, the Product.fromMap already tries to parse imagePaths from the JSON string.
+        final restoredProduct = Product.fromMap(productData);
+        final List<String> remotePaths = restoredProduct.imagePaths;
 
-        productData['imagePath'] = null; 
+        for (int idx = 0; idx < remotePaths.length || idx < 5; idx++) {
+          final String fileName = "${entryKey}_$idx.jpg";
+          final String localPath = p.join(imagesPath, fileName);
+          final File localFile = File(localPath);
 
-        try {
-          final ref = _storageRef.child("$entryKey.jpg");
-          
-          // Check if we already have it
-          if (localFile.existsSync() && localFile.lengthSync() > 0) {
-            productData['imagePath'] = localImagePath;
-          } else {
-            // Attempt download
-            try {
-              final Uint8List? data = await ref.getData(15 * 1024 * 1024).timeout(const Duration(seconds: 15)); 
+          try {
+            final ref = _storageRef.child(fileName);
+            if (localFile.existsSync() && localFile.lengthSync() > 0) {
+              localPaths.add(localPath);
+            } else {
+              final Uint8List? data = await ref.getData(15 * 1024 * 1024).timeout(const Duration(seconds: 10)); 
               if (data != null) {
                 await localFile.writeAsBytes(data);
                 if (localFile.existsSync()) {
-                  productData['imagePath'] = localImagePath;
+                  localPaths.add(localPath);
                 }
               }
-            } catch (e) {
-              debugPrint("Restore: No image found or download failed for $entryKey: $e");
             }
+          } catch (_) {
+             // If idx > remotePaths.length and fails, it means we've reached the end of available images
+             if (idx >= (remotePaths.isNotEmpty ? remotePaths.length : 1)) break;
           }
-        } catch (e) {
-          debugPrint("Restore: Storage ref error for $entryKey: $e");
         }
 
-        productData['id'] = null; 
-        productData['isSynced'] = 1;
-        restoredProducts.add(Product.fromMap(productData));
+        restoredProduct.imagePaths = localPaths;
+        restoredProduct.id = null; 
+        restoredProduct.isSynced = true;
+        restoredProducts.add(restoredProduct);
       } catch (e) {
         debugPrint("Restore: Error parsing entry: $e");
       } finally {

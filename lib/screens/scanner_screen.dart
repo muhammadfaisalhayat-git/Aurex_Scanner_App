@@ -28,9 +28,15 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
   CameraController? _controller;
   bool _isProcessing = false;
   bool _isAnalyzing = false;
-  String? _capturedImagePath;
   bool _isFlashOn = false;
   
+  // Multi-shot state
+  final List<String> _capturedPaths = [];
+  final List<RecognizedText> _capturedTexts = [];
+  final List<Size> _capturedSizes = [];
+  final List<List<TextBlock>> _capturedBlocks = [];
+  String? _lastBarcode;
+
   // Zoom state
   double _minZoomLevel = 1.0;
   double _maxZoomLevel = 1.0;
@@ -39,33 +45,23 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
 
   // Real-time metadata
   List<_HighlightBox> _realtimeHighlights = [];
-  List<TextBlock> _processingBlocks = [];
 
   late AnimationController _laserController;
   late Animation<double> _laserAnimation;
 
   final _textRecognizer = TextRecognizer();
   final _barcodeScanner = BarcodeScanner();
-  
-  // Audio configuration
   final _audioPlayer = AudioPlayer();
   final _beepSource = AssetSource('sounds/beep.wav');
-  
-  Timer? _analysisTimer;
-  final Set<String> _beepedData = {};
   int _lastAnalysisTime = 0;
+  final Set<String> _beepedData = {};
 
   @override
   void initState() {
     super.initState();
     _initializeCamera();
     _setupAudio();
-    
-    _laserController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 2000),
-    )..repeat();
-    
+    _laserController = AnimationController(vsync: this, duration: const Duration(milliseconds: 2000))..repeat();
     _laserAnimation = Tween<double>(begin: 0, end: 1).animate(_laserController);
   }
 
@@ -73,17 +69,11 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
     try {
       await _audioPlayer.setSource(_beepSource);
       await _audioPlayer.setPlayerMode(PlayerMode.lowLatency);
-    } catch (e) {
-      debugPrint("Audio Setup Error: $e");
-    }
+    } catch (_) {}
   }
 
   Future<void> _playBeep() async {
-    try {
-      await _audioPlayer.play(_beepSource, mode: PlayerMode.lowLatency);
-    } catch (e) {
-      debugPrint("Audio Play Error: $e");
-    }
+    try { await _audioPlayer.play(_beepSource, mode: PlayerMode.lowLatency); } catch (_) {}
   }
 
   Future<void> _initializeCamera() async {
@@ -92,10 +82,7 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
     
     CameraDescription? mainCamera;
     for (var c in cameras) {
-      if (c.lensDirection == CameraLensDirection.back) {
-        mainCamera = c;
-        break;
-      }
+      if (c.lensDirection == CameraLensDirection.back) { mainCamera = c; break; }
     }
     mainCamera ??= cameras[0];
 
@@ -103,18 +90,13 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
       mainCamera, 
       ResolutionPreset.high,
       enableAudio: false,
-      imageFormatGroup: Platform.isAndroid
-          ? ImageFormatGroup.nv21
-          : ImageFormatGroup.bgra8888,
+      imageFormatGroup: Platform.isAndroid ? ImageFormatGroup.nv21 : ImageFormatGroup.bgra8888,
     );
     
     try {
       await _controller!.initialize();
-      
-      // Get zoom capabilities
       _minZoomLevel = await _controller!.getMinZoomLevel();
       _maxZoomLevel = await _controller!.getMaxZoomLevel();
-      
       if (mounted) {
         setState(() {});
         _startImageStream();
@@ -124,41 +106,20 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
     }
   }
 
-  void _handleScaleStart(ScaleStartDetails details) {
-    _baseZoomLevel = _currentZoomLevel;
-  }
-
-  void _handleScaleUpdate(ScaleUpdateDetails details) {
-    if (_controller == null || !_controller!.value.isInitialized) return;
-
-    // Calculate new zoom level based on scale
-    double newZoomLevel = (_baseZoomLevel * details.scale).clamp(_minZoomLevel, _maxZoomLevel);
-    
-    if (newZoomLevel != _currentZoomLevel) {
-      _currentZoomLevel = newZoomLevel;
-      _controller!.setZoomLevel(_currentZoomLevel);
-      setState(() {});
-    }
-  }
-
   void _startImageStream() {
     if (_controller == null || !_controller!.value.isInitialized) return;
 
     _controller!.startImageStream((CameraImage image) async {
       if (_isProcessing || _isAnalyzing) return;
 
-      // Throttle analysis to once every 1200ms
       final now = DateTime.now().millisecondsSinceEpoch;
-      if (now - _lastAnalysisTime < 1200) return;
+      if (now - _lastAnalysisTime < 1500) return;
       _lastAnalysisTime = now;
 
       _isAnalyzing = true;
       try {
         final inputImage = _inputImageFromCameraImage(image);
-        if (inputImage == null) {
-          _isAnalyzing = false;
-          return;
-        }
+        if (inputImage == null) { _isAnalyzing = false; return; }
 
         final results = await Future.wait([
           _barcodeScanner.processImage(inputImage),
@@ -167,19 +128,14 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
 
         final barcodes = results[0] as List<Barcode>;
         final recognizedText = results[1] as RecognizedText;
-        
         List<_HighlightBox> boxes = [];
         bool newlyDetected = false;
 
         if (barcodes.isNotEmpty) {
            final code = barcodes.first.rawValue ?? "";
-           if (!_beepedData.contains(code)) {
-              newlyDetected = true;
-              _beepedData.add(code);
-           }
-           if (barcodes.first.boundingBox != null) {
-              boxes.add(_HighlightBox(barcodes.first.boundingBox!, Colors.blue));
-           }
+           _lastBarcode = code;
+           if (!_beepedData.contains(code)) { newlyDetected = true; _beepedData.add(code); }
+           if (barcodes.first.boundingBox != null) boxes.add(_HighlightBox(barcodes.first.boundingBox!, Colors.blue));
         }
 
         final dateRegex = RegExp(r'\b\d{1,2}[./ \-]\d{2,4}\b');
@@ -188,33 +144,21 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
           for (var line in block.lines) {
             if (dateRegex.hasMatch(line.text)) {
               final val = dateRegex.firstMatch(line.text)!.group(0)!;
-              if (!_beepedData.contains(val)) {
-                 newlyDetected = true;
-                 _beepedData.add(val);
-              }
-              Color color = Colors.green; 
-              if (blockText.contains("exp") || blockText.contains("expire") || blockText.contains("valid") || blockText.contains("انتهاء")) {
-                color = Colors.red;
-              }
+              if (!_beepedData.contains(val)) { newlyDetected = true; _beepedData.add(val); }
+              Color color = (blockText.contains("exp") || blockText.contains("انتهاء")) ? Colors.red : Colors.green;
               boxes.add(_HighlightBox(line.boundingBox, color));
             }
           }
         }
 
         if (mounted && boxes.isNotEmpty) {
-          if (newlyDetected) {
-            unawaited(_playBeep());
-          }
-          setState(() {
-            _realtimeHighlights = boxes;
-          });
+          if (newlyDetected) unawaited(_playBeep());
+          setState(() { _realtimeHighlights = boxes; });
           Future.delayed(const Duration(milliseconds: 600), () {
             if (mounted) setState(() => _realtimeHighlights = []);
           });
         }
-      } catch (e) {
-        debugPrint("Analysis Error: $e");
-      }
+      } catch (_) {}
       _isAnalyzing = false;
     });
   }
@@ -241,33 +185,25 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
 
   Uint8List _concatenatePlanes(List<Plane> planes) {
     final allBytes = BytesBuilder();
-    for (final plane in planes) {
-      allBytes.add(plane.bytes);
-    }
+    for (final plane in planes) { allBytes.add(plane.bytes); }
     return allBytes.toBytes();
   }
 
   Future<void> _capture() async {
     if (_controller == null || !_controller!.value.isInitialized || _isProcessing) return;
     
-    setState(() => _isProcessing = true);
     unawaited(_playBeep());
 
     try {
-      await _controller!.stopImageStream().catchError((_) {});
       final XFile rawImage = await _controller!.takePicture();
       
-      // Move to permanent storage immediately
       final directory = await getApplicationDocumentsDirectory();
       final String imagesPath = p.join(directory.path, 'product_images');
       final dir = Directory(imagesPath);
       if (!await dir.exists()) await dir.create(recursive: true);
       
-      final String permanentPath = p.join(imagesPath, "scan_${DateTime.now().millisecondsSinceEpoch}.jpg");
+      final String permanentPath = p.join(imagesPath, "shot_${_capturedPaths.length}_${DateTime.now().millisecondsSinceEpoch}.jpg");
       final File imageFile = await File(rawImage.path).copy(permanentPath);
-      _capturedImagePath = imageFile.path;
-      
-      if (mounted) setState(() {});
 
       final bytes = await imageFile.readAsBytes();
       final decoded = await decodeImageFromList(bytes);
@@ -275,36 +211,55 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
 
       final inputImage = InputImage.fromFilePath(imageFile.path);
       final recognizedText = await _textRecognizer.processImage(inputImage);
-      if (mounted) setState(() { _processingBlocks = recognizedText.blocks; });
 
-      await Future.delayed(const Duration(seconds: 3));
+      setState(() {
+        _capturedPaths.add(imageFile.path);
+        _capturedTexts.add(recognizedText);
+        _capturedSizes.add(imageSize);
+        _capturedBlocks.add(recognizedText.blocks);
+      });
 
-      final barcodes = await _barcodeScanner.processImage(inputImage);
-      
-      Product product = NeuralPostProcessor().refine(recognizedText, imageSize);
-      product = LearningService().applySpatialIntelligence(product, recognizedText.blocks);
-
-      product.barcode = barcodes.isNotEmpty ? barcodes.first.rawValue : null;
-      product.productCode = product.barcode ?? product.productCode;
-      product.imagePath = imageFile.path;
+      // Show temporary overlay effect
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text("Captured Photo #${_capturedPaths.length}"),
+        duration: const Duration(seconds: 1),
+        behavior: SnackBarBehavior.floating,
+      ));
 
       File(rawImage.path).delete().catchError((_) {});
+    } catch (e) {
+      debugPrint("Capture Error: $e");
+    }
+  }
+
+  Future<void> _finish() async {
+    if (_capturedPaths.isEmpty) return;
+    setState(() => _isProcessing = true);
+    
+    try {
+      // Aggregate data from all captured images
+      Product product = NeuralPostProcessor().refineMulti(_capturedTexts, _capturedSizes);
+      
+      // Apply spatial intelligence from all blocks
+      for (var blocks in _capturedBlocks) {
+        product = LearningService().applySpatialIntelligence(product, blocks);
+      }
+
+      product.barcode = _lastBarcode;
+      product.productCode = product.barcode ?? product.productCode;
+      product.imagePaths = List.from(_capturedPaths);
 
       if (mounted) {
         setState(() => _isProcessing = false);
         Navigator.pushReplacement(context, MaterialPageRoute(builder: (c) => ResultScreen(product: product)));
       }
     } catch (e) {
-      if (mounted) {
-        setState(() => _isProcessing = false);
-        _startImageStream();
-      }
+      if (mounted) setState(() => _isProcessing = false);
     }
   }
 
   @override
   void dispose() {
-    _analysisTimer?.cancel();
     _laserController.dispose();
     _controller?.dispose();
     _textRecognizer.close();
@@ -318,70 +273,76 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
     if (_controller == null || !_controller!.value.isInitialized) {
       return const Scaffold(backgroundColor: Colors.black, body: Center(child: CircularProgressIndicator(color: Colors.green)));
     }
+    final l10n = AppLocalizations.of(context)!;
+    
     return Scaffold(
       backgroundColor: Colors.black,
       body: Stack(
         children: [
           Positioned.fill(
             child: GestureDetector(
-              onScaleStart: _handleScaleStart,
-              onScaleUpdate: _handleScaleUpdate,
+              onScaleStart: (d) => _baseZoomLevel = _currentZoomLevel,
+              onScaleUpdate: (d) {
+                double newZoom = (_baseZoomLevel * d.scale).clamp(_minZoomLevel, _maxZoomLevel);
+                if (newZoom != _currentZoomLevel) {
+                  _currentZoomLevel = newZoom;
+                  _controller!.setZoomLevel(_currentZoomLevel);
+                  setState(() {});
+                }
+              },
               child: CameraPreview(_controller!),
             ),
           ),
           
           ..._realtimeHighlights.map((box) => _MappedHighlight(rect: box.rect, color: box.color)),
-          
           Container(decoration: const ShapeDecoration(shape: _LegacyScannerOverlay(laserPosition: 0, showLaser: false))),
 
-          // Zoom level indicator
           if (_currentZoomLevel > 1.0)
-            Positioned(
-              bottom: 140, left: 0, right: 0,
-              child: Center(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                  decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(20)),
-                  child: Text("${_currentZoomLevel.toStringAsFixed(1)}x", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                ),
-              ),
-            ),
+            Positioned(bottom: 150, left: 0, right: 0, child: Center(child: Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4), decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(20)), child: Text("${_currentZoomLevel.toStringAsFixed(1)}x", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold))))),
 
-          if (_isProcessing && _capturedImagePath != null) _buildProcessingUI(),
+          if (_isProcessing) _buildProcessingUI(),
 
           if (!_isProcessing)
-            Positioned(
-              top: 50, left: 10,
-              child: IconButton(icon: const Icon(Icons.arrow_back, color: Colors.white, size: 35), onPressed: () => Navigator.pop(context)),
-            ),
+            Positioned(top: 50, left: 10, child: IconButton(icon: const Icon(Icons.arrow_back, color: Colors.white, size: 35), onPressed: () => Navigator.pop(context))),
 
           if (!_isProcessing)
             Positioned(
               bottom: 40, left: 0, right: 0,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  IconButton(
-                    icon: Icon(_isFlashOn ? Icons.flash_on : Icons.flash_off, color: Colors.white, size: 30),
-                    onPressed: () {
-                      _isFlashOn = !_isFlashOn;
-                      _controller?.setFlashMode(_isFlashOn ? FlashMode.torch : FlashMode.off);
-                      setState(() {});
-                    },
-                  ),
-                  GestureDetector(
-                    onTap: _capture,
-                    child: Container(
-                      height: 85, width: 85,
-                      decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 4)),
-                      child: const Center(child: Icon(Icons.camera_alt, color: Colors.white, size: 45)),
+                  if (_capturedPaths.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 20),
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15)),
+                        onPressed: _finish,
+                        icon: const Icon(Icons.check_circle),
+                        label: Text("FINISH & PROCESS (${_capturedPaths.length})", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                      ),
                     ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      IconButton(
+                        icon: Icon(_isFlashOn ? Icons.flash_on : Icons.flash_off, color: Colors.white, size: 30),
+                        onPressed: () {
+                          _isFlashOn = !_isFlashOn;
+                          _controller?.setFlashMode(_isFlashOn ? FlashMode.torch : FlashMode.off);
+                          setState(() {});
+                        },
+                      ),
+                      GestureDetector(
+                        onTap: _capture,
+                        child: Container(
+                          height: 85, width: 85,
+                          decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 4)),
+                          child: const Center(child: Icon(Icons.camera_alt, color: Colors.white, size: 45)),
+                        ),
+                      ),
+                      IconButton(icon: const Icon(Icons.history, color: Colors.white, size: 30), onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const ProductListScreen()))),
+                    ],
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.history, color: Colors.white, size: 30),
-                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const ProductListScreen())),
-                  ),
-                  IconButton(icon: const Icon(Icons.image, color: Colors.white, size: 30), onPressed: () {}),
                 ],
               ),
             ),
@@ -391,50 +352,18 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
   }
 
   Widget _buildProcessingUI() {
-    return AnimatedBuilder(
-      animation: _laserAnimation,
-      builder: (context, child) {
-        final double h = MediaQuery.of(context).size.height;
-        final double laserY = h * _laserAnimation.value;
-        return Container(
-          color: Colors.black,
-          child: Stack(
-            children: [
-              Positioned.fill(child: Image.file(File(_capturedImagePath!), fit: BoxFit.cover)),
-              Container(color: Colors.black45),
-              ..._processingBlocks.map((block) {
-                final r = block.boundingBox;
-                final bool isHit = laserY > r.top && laserY < r.bottom + 80;
-                return Positioned(
-                  left: r.left, top: r.top,
-                  child: AnimatedOpacity(
-                    duration: const Duration(milliseconds: 150),
-                    opacity: isHit ? 1.0 : 0.0,
-                    child: Container(
-                      width: r.width, height: r.height,
-                      decoration: BoxDecoration(color: Colors.green.withOpacity(0.2), border: Border.all(color: Colors.greenAccent, width: 2)),
-                    ),
-                  ),
-                );
-              }),
-              Positioned(
-                top: laserY, left: 0, right: 0,
-                child: Container(height: 3, decoration: BoxDecoration(color: Colors.greenAccent, boxShadow: [BoxShadow(color: Colors.greenAccent, blurRadius: 15, spreadRadius: 2)])),
-              ),
-              Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const CircularProgressIndicator(color: Colors.white, strokeWidth: 4),
-                    const SizedBox(height: 30),
-                    Text(AppLocalizations.of(context)!.pleaseWaitProcessing, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold, decoration: TextDecoration.none)),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        );
-      },
+    return Container(
+      color: Colors.black87,
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const CircularProgressIndicator(color: Colors.white, strokeWidth: 4),
+            const SizedBox(height: 30),
+            Text(AppLocalizations.of(context)!.pleaseWaitProcessing, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold, decoration: TextDecoration.none)),
+          ],
+        ),
+      ),
     );
   }
 }

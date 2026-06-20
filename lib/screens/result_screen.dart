@@ -7,6 +7,7 @@ import '../services/learning_service.dart';
 import '../widgets/highlighted_image.dart';
 import 'field_scanner_screen.dart';
 import 'dart:async';
+import 'dart:io';
 import '../l10n/app_localizations.dart';
 
 class ResultScreen extends StatefulWidget {
@@ -89,12 +90,24 @@ class _ResultScreenState extends State<ResultScreen> {
       ),
       body: SingleChildScrollView(
         child: Column(children: [
-          if (widget.product.imagePath != null) 
-            HighlightedImage(
-              imagePath: widget.product.imagePath!, 
-              mfgBox: widget.product.mfgBox, 
-              expBox: widget.product.expBox,
-              height: 250
+          if (widget.product.imagePaths.isNotEmpty) 
+            SizedBox(
+              height: 250,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                itemCount: widget.product.imagePaths.length,
+                itemBuilder: (context, index) {
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 4),
+                    child: HighlightedImage(
+                      imagePath: widget.product.imagePaths[index], 
+                      mfgBox: index == 0 ? widget.product.mfgBox : null, // Only highlight on first image
+                      expBox: index == 0 ? widget.product.expBox : null,
+                      height: 250
+                    ),
+                  );
+                },
+              ),
             )
           else
             Container(

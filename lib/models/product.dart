@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 class Product {
   int? id;
   String productCode;
@@ -7,7 +9,7 @@ class Product {
   String quantity;
   String? size;
   String? category;
-  String? imagePath;
+  List<String> imagePaths; // Changed from single imagePath
   String? warehouseName;
   String? barcode;
   bool isSynced;
@@ -29,7 +31,7 @@ class Product {
     this.quantity = "1",
     this.size,
     this.category = "General",
-    this.imagePath,
+    this.imagePaths = const [],
     this.warehouseName,
     this.barcode,
     this.isSynced = false,
@@ -38,6 +40,8 @@ class Product {
     this.groupId = "lafi_al_harbi_group",
     this.companyId = "bin_awf",
   });
+
+  String? get imagePath => imagePaths.isNotEmpty ? imagePaths.first : null;
 
   Map<String, dynamic> toMap() {
     return {
@@ -49,7 +53,7 @@ class Product {
       'quantity': quantity,
       'size': size,
       'category': category,
-      'imagePath': imagePath,
+      'imagePath': json.encode(imagePaths), // Store as JSON string
       'warehouseName': warehouseName,
       'barcode': barcode,
       'isSynced': isSynced ? 1 : 0,
@@ -61,6 +65,20 @@ class Product {
   }
 
   factory Product.fromMap(Map<dynamic, dynamic> map) {
+    List<String> paths = [];
+    final dynamic rawPath = map['imagePath'];
+    if (rawPath != null && rawPath is String) {
+      if (rawPath.startsWith('[') && rawPath.endsWith(']')) {
+        try {
+          paths = List<String>.from(json.decode(rawPath));
+        } catch (_) {
+          paths = [rawPath];
+        }
+      } else {
+        paths = [rawPath];
+      }
+    }
+
     return Product(
       id: map['id'],
       productCode: map['productCode'] ?? map['product_code'] ?? "",
@@ -70,7 +88,7 @@ class Product {
       quantity: map['quantity'] ?? "1",
       size: map['size'] ?? map['weight'],
       category: map['category'] ?? "General",
-      imagePath: map['imagePath'],
+      imagePaths: paths,
       warehouseName: map['warehouseName'],
       barcode: map['barcode'],
       isSynced: map['isSynced'] == 1 || map['isSynced'] == true,

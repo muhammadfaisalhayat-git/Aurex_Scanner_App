@@ -8,6 +8,46 @@ class NeuralPostProcessor {
   factory NeuralPostProcessor() => _instance;
   NeuralPostProcessor._internal();
 
+  /// Refines product data by aggregating information from multiple captured images
+  Product refineMulti(List<RecognizedText> allRawTexts, List<Size> allSizes) {
+    String? finalName;
+    String? finalMfg;
+    String? finalExp;
+    String? finalMfgBox;
+    String? finalExpBox;
+    String? finalSize;
+    String finalQty = "1";
+
+    for (int i = 0; i < allRawTexts.length; i++) {
+      final p = refine(allRawTexts[i], allSizes[i]);
+      
+      // Merge strategy: Keep the first solid detection
+      if (finalName == null || finalName == "Unknown Product") {
+        if (p.name != "Unknown Product") finalName = p.name;
+      }
+      
+      finalMfg ??= p.mfgDate;
+      finalMfgBox ??= p.mfgBox;
+      
+      finalExp ??= p.expDate;
+      finalExpBox ??= p.expBox;
+      
+      finalSize ??= p.size;
+      if (finalQty == "1" && p.quantity != "1") finalQty = p.quantity;
+    }
+
+    return Product(
+      productCode: "",
+      name: finalName ?? "Unknown Product",
+      mfgDate: finalMfg,
+      expDate: finalExp,
+      mfgBox: finalMfgBox,
+      expBox: finalExpBox,
+      size: finalSize,
+      quantity: finalQty,
+    );
+  }
+
   Product refine(RecognizedText rawText, Size imageSize) {
     // 1. Pre-process: Split merged lines by whitespace to handle multi-column blocks
     final List<_StructuralLine> allLines = _extractStructuralLines(rawText);

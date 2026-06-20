@@ -55,9 +55,22 @@ class ProductCard extends StatelessWidget {
           onTap: onTap,
           child: Row(
             children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(10),
-                child: imageWidget,
+              Stack(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: imageWidget,
+                  ),
+                  if (product.imagePaths.length > 1)
+                    Positioned(
+                      right: 4, bottom: 4,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(8)),
+                        child: Text("${product.imagePaths.length}", style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                ],
               ),
               const SizedBox(width: 15),
               Expanded(
