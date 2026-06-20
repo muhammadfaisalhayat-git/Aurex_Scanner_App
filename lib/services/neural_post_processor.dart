@@ -249,10 +249,10 @@ class NeuralPostProcessor {
     if (cRect.top > aRect.top && dyNorm < 0.25) {
        // Check if centers are horizontally aligned (within column bounds)
        final double hOverlap = _calculateHorizontalOverlap(aRect, cRect);
-       if (hOverlap > 0.4 || (aCenterX - cCenterX).abs() < aRect.width * 0.5) {
-          double gridScore = 0.9 - (dyNorm * 2.5);
-          // Boost if centers are very close
-          if ((aCenterX - cCenterX).abs() < aRect.width * 0.2) gridScore += 0.1;
+       if (hOverlap > 0.3 || (aCenterX - cCenterX).abs() < aRect.width * 0.5) {
+          double gridScore = 0.95 - (dyNorm * 2.5);
+          // Boost if centers are very close (highly likely in seed grids)
+          if ((aCenterX - cCenterX).abs() < aRect.width * 0.15) gridScore += 0.05;
           return gridScore.clamp(0.0, 1.0);
        }
     }
