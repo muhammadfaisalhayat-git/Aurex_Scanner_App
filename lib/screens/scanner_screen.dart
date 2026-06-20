@@ -311,14 +311,46 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  // Clear Visual Counter for Captured Photos
                   if (_capturedPaths.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 20),
-                      child: ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15)),
-                        onPressed: _finish,
-                        icon: const Icon(Icons.check_circle),
-                        label: Text("FINISH & PROCESS (${_capturedPaths.length})", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                      child: Column(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: Colors.green.withOpacity(0.9),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: Colors.white, width: 2),
+                              boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 10)]
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.photo_library, color: Colors.white, size: 20),
+                                const SizedBox(width: 8),
+                                Text(
+                                  "${_capturedPaths.length} PHOTOS CAPTURED",
+                                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.white, 
+                              foregroundColor: Colors.green.shade800, 
+                              padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
+                              elevation: 5,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                            ),
+                            onPressed: _finish,
+                            icon: const Icon(Icons.check_circle, size: 24),
+                            label: const Text("FINISH & PROCESS", style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, letterSpacing: 1.2)),
+                          ),
+                        ],
                       ),
                     ),
                   Row(
