@@ -30,8 +30,11 @@ class ProductCard extends StatelessWidget {
     }
 
     Widget imageWidget;
-    if (product.imagePath != null && product.imagePath!.isNotEmpty) {
-      final file = File(product.imagePath!);
+    // Explicitly use the first image path as the primary thumbnail
+    final String? thumbnailPath = product.imagePaths.isNotEmpty ? product.imagePaths.first : null;
+    
+    if (thumbnailPath != null && thumbnailPath.isNotEmpty) {
+      final file = File(thumbnailPath);
       if (file.existsSync()) {
         imageWidget = Image.file(file, width: 70, height: 70, fit: BoxFit.cover);
       } else {
