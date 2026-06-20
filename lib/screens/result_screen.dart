@@ -76,34 +76,44 @@ class _ResultScreenState extends State<ResultScreen> {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
     final isDark = theme.brightness == Brightness.dark;
+    final screenWidth = MediaQuery.of(context).size.width;
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text(l10n.productDetails, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         backgroundColor: theme.colorScheme.primary,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
+        iconTheme: const IconThemeData(color: Colors.white),
         actions: [IconButton(icon: const Icon(Icons.notifications, color: Colors.white), onPressed: () {})],
       ),
       body: SingleChildScrollView(
         child: Column(children: [
           if (widget.product.imagePaths.isNotEmpty) 
-            SizedBox(
-              height: 250,
+            Container(
+              height: 280,
+              width: double.infinity,
+              color: isDark ? Colors.black : Colors.grey.shade100,
+              padding: const EdgeInsets.symmetric(vertical: 10),
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 10),
                 itemCount: widget.product.imagePaths.length,
                 itemBuilder: (context, index) {
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 4),
+                  return Container(
+                    width: screenWidth * 0.85, // Give it a definite width
+                    margin: const EdgeInsets.only(right: 12),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(15),
+                      boxShadow: [
+                        BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 8, offset: const Offset(0, 4))
+                      ]
+                    ),
+                    clipBehavior: Clip.antiAlias,
                     child: HighlightedImage(
                       imagePath: widget.product.imagePaths[index], 
-                      mfgBox: index == 0 ? widget.product.mfgBox : null, // Only highlight on first image
+                      mfgBox: index == 0 ? widget.product.mfgBox : null,
                       expBox: index == 0 ? widget.product.expBox : null,
-                      height: 250
+                      height: 260
                     ),
                   );
                 },
@@ -178,8 +188,9 @@ class _ResultScreenState extends State<ResultScreen> {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: isDark ? Colors.grey.shade900 : Colors.grey.shade200, 
-        borderRadius: BorderRadius.circular(8)
+        color: isDark ? Colors.grey.shade900 : Colors.grey.shade100, 
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: isDark ? Colors.grey.shade800 : Colors.transparent)
       ),
       child: TextField(
         controller: ctrl, 
@@ -187,7 +198,7 @@ class _ResultScreenState extends State<ResultScreen> {
         style: TextStyle(color: isDark ? Colors.white : Colors.black),
         decoration: InputDecoration(
           labelText: lbl, 
-          labelStyle: TextStyle(color: isDark ? Colors.grey : Colors.grey, fontSize: 14),
+          labelStyle: TextStyle(color: isDark ? Colors.grey : Colors.grey.shade600, fontSize: 14),
           suffixIcon: IconButton(
             icon: Icon(Icons.qr_code_scanner, color: isDark ? Colors.grey : Colors.grey), 
             onPressed: () async {
