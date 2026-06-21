@@ -41,10 +41,14 @@ class FirebaseService {
     int count = 0;
     Map<String, dynamic> updates = {};
 
+    debugPrint("Backup: Starting backup for $total products...");
+
     for (int i = 0; i < products.length; i++) {
       final product = products[i];
       String key = product.productCode.replaceAll(RegExp(r'[.#$\[\]/]'), '_');
-      if (key.isEmpty) key = "ID_${product.id}_${DateTime.now().millisecondsSinceEpoch}";
+      if (key.isEmpty) {
+        key = "ID_${product.id}_${DateTime.now().millisecondsSinceEpoch}";
+      }
       
       bool allImagesUploaded = true;
 
@@ -55,7 +59,7 @@ class FirebaseService {
         if (imageFile.existsSync()) {
           try {
             final String fileName = "${key}_$imgIndex.jpg";
-            await _storageRef.child(fileName).putFile(imageFile).timeout(const Duration(seconds: 30));
+            await _storageRef.child(fileName).putFile(imageFile).timeout(const Duration(seconds: 40));
             debugPrint("Backup: Successfully uploaded image $fileName");
           } catch (e) {
             allImagesUploaded = false;
@@ -67,7 +71,6 @@ class FirebaseService {
       if (allImagesUploaded) {
         product.isSynced = true;
         final productMap = product.toMap();
-        // The imagePaths are stored as a JSON string in toMap
         updates[key] = productMap;
       }
       
@@ -76,17 +79,40 @@ class FirebaseService {
     }
     
     if (updates.isNotEmpty) {
-      await _productRef.update(updates).timeout(const Duration(seconds: 20));
-      final ds = DatabaseService();
-      for (var p in products) {
-        if (p.isSynced) await ds.updateProduct(p);
+      try {
+        await _productRef.update(updates).timeout(const Duration(seconds: 30));
+        debugPrint("Backup: Successfully updated RTDB with ${updates.length} records.");
+        
+        final ds = DatabaseService();
+        for (var p in products) {
+          if (p.isSynced) await ds.updateProduct(p);
+        }
+      } catch (e) {
+        debugPrint("Backup: RTDB update FAILED: $e");
+        rethrow;
       }
+    } else {
+      debugPrint("Backup: No updates to push to server.");
     }
   }
 
   Future<int?> restoreAll({Function(int current, int total)? onProgress}) async {
-    final snapshot = await _productRef.get().timeout(const Duration(seconds: 20));
-    if (!snapshot.exists || snapshot.value == null) return null;
+    debugPrint("Restore: Fetching data from server...");
+    
+    DataSnapshot snapshot;
+    try {
+      snapshot = await _productRef.get().timeout(const Duration(seconds: 30));
+    } catch (e) {
+      debugPrint("Restore: Failed to fetch snapshot: $e");
+      rethrow;
+    }
+
+    if (!snapshot.exists || snapshot.value == null) {
+      debugPrint("Restore: No data found at ${_productRef.path}");
+      return null;
+    }
+
+    debugPrint("Restore: Snapshot received. Parsing data...");
 
     final dbService = DatabaseService();
     final String imagesPath = await _getImagesDirectory();
@@ -102,45 +128,47 @@ class FirebaseService {
     }
 
     final int total = rawData.length;
+    debugPrint("Restore: Found $total entries in backup.");
+    
     int processedCount = 0;
     List<Product> restoredProducts = [];
 
     for (var entry in rawData.entries) {
       try {
-        final productData = Map<String, dynamic>.from(entry.value as Map);
-        final String entryKey = entry.key.toString();
+        // Safe casting for Firebase dynamic maps
+        final Map<dynamic, dynamic> entryValue = entry.value as Map;
+        final Map<String, dynamic> productData = entryValue.map((k, v) => MapEntry(k.toString(), v));
         
-        // Handle multiple images from cloud
+        final String entryKey = entry.key.toString();
         List<String> localPaths = [];
         
-        // We attempt to download images based on a standard naming convention
-        // since we don't know the exact count in advance easily without storing metadata,
-        // or we can store the count.
-        // Actually, the Product.fromMap already tries to parse imagePaths from the JSON string.
         final restoredProduct = Product.fromMap(productData);
         final List<String> remotePaths = restoredProduct.imagePaths;
 
-        for (int idx = 0; idx < remotePaths.length || idx < 5; idx++) {
+        // Try to download all associated images
+        // We look for indexed names: entryKey_0.jpg, entryKey_1.jpg, etc.
+        for (int idx = 0; idx < 10; idx++) {
           final String fileName = "${entryKey}_$idx.jpg";
           final String localPath = p.join(imagesPath, fileName);
           final File localFile = File(localPath);
 
           try {
-            final ref = _storageRef.child(fileName);
             if (localFile.existsSync() && localFile.lengthSync() > 0) {
               localPaths.add(localPath);
             } else {
-              final Uint8List? data = await ref.getData(15 * 1024 * 1024).timeout(const Duration(seconds: 10)); 
+              final ref = _storageRef.child(fileName);
+              final Uint8List? data = await ref.getData(15 * 1024 * 1024).timeout(const Duration(seconds: 20)); 
               if (data != null) {
                 await localFile.writeAsBytes(data);
                 if (localFile.existsSync()) {
                   localPaths.add(localPath);
+                  debugPrint("Restore: Downloaded $fileName");
                 }
               }
             }
-          } catch (_) {
-             // If idx > remotePaths.length and fails, it means we've reached the end of available images
-             if (idx >= (remotePaths.isNotEmpty ? remotePaths.length : 1)) break;
+          } catch (e) {
+            // Stop looking after first missing index if we have no remotePath count
+            if (idx >= (remotePaths.isNotEmpty ? remotePaths.length : 1)) break;
           }
         }
 
@@ -148,8 +176,9 @@ class FirebaseService {
         restoredProduct.id = null; 
         restoredProduct.isSynced = true;
         restoredProducts.add(restoredProduct);
+        debugPrint("Restore: Successfully parsed product '${restoredProduct.name}'");
       } catch (e) {
-        debugPrint("Restore: Error parsing entry: $e");
+        debugPrint("Restore: Error parsing entry ${entry.key}: $e");
       } finally {
         processedCount++;
         if (onProgress != null) onProgress(processedCount, total);
@@ -157,22 +186,27 @@ class FirebaseService {
     }
 
     if (restoredProducts.isNotEmpty) {
+      debugPrint("Restore: Committing ${restoredProducts.length} products to local database.");
       await dbService.deleteAll();
       await dbService.batchInsertProducts(restoredProducts);
+    } else {
+      debugPrint("Restore: No valid products were parsed from the backup.");
     }
     
     return restoredProducts.length;
   }
 
   Future<void> wipeDataFromServer() async {
+    debugPrint("Wipe: Deleting all cloud data for user...");
     await _productRef.remove();
     try {
       final listResult = await _storageRef.listAll();
       for (var item in listResult.items) {
         await item.delete();
       }
+      debugPrint("Wipe: Cloud data wiped successfully.");
     } catch (e) {
-      debugPrint("Storage wipe error: $e");
+      debugPrint("Wipe error: $e");
     }
   }
 }
