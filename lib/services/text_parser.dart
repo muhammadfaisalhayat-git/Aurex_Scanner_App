@@ -9,7 +9,7 @@ class TextParser {
     "انتاج", "تاريخ الانتاج", "تاريخ الإنتاج", "تاريخ الصنع", "تاريخ التصنيع", "تاريخ التعبئة", "تعبئة", "صنع", "DOM", "MFD", "test date", "تاريخ الفحص", "ت الفحص", "ت. فحص", "فحص",
     "تاريخ التغليف", "فحص في", "manufactured", "prepared", "creation date", "date of mfg", "P.Date", "ت.انتاج", "ت.صنع", "batch date", "analysis date", "tested on", "test. date",
     "تاريخ الإنتاج", "تاريخ انتاج", "صنع في", "تعبئة في", "تاريخ التعبئة",
-    "PND", "تاريخ التعبئة والإنتاج", "ت.إ.", "تاريخ الإنتاج والتصنيع", "ت.ت."
+    "PND", "تاريخ التعبئة والإنتاج", "ت.إ.", "تاريخ الإنتاج والتصنيع", "ت.ت.", "تاريخ انتاج"
   ];
 
   // Agricultural expiry/validity keywords
@@ -18,13 +18,14 @@ class TextParser {
     "انتهاء", "تاريخ الانتهاء", "تاريخ الإنتهاء", "تاريخ النتهاء", "تاريخ انتهاء", "صلاحية", "DOE", "EXP", "يستخدم قبل", "ينتهي في", "صالح حتى", "تاريخ الصلاحية", "مدة الصلاحية", "تاريخ انتهاء الصلاحية",
     "E.Date", "expires", "shelf life", "validity period", "best by", "consume before", "ت.انتهاء", "ت.صلاحية", "صالح لمدة", "يبقى صالحا", "تاريخ الاستهلاك", "حد اقصى", "استخدم قبل",
     "تاريخ الانتهاء", "تاريخ الصلاحية", "صالحة لمدة", "يستعمل قبل", "صلاحية لغاية", "تاريخ إنتهاء", "ينتهي بـ",
-    "BB", "Best Before", "يفضل استهلاكه قبل", "ت.أ.", "BBD", "Best Before Date", "تاريخ أفضلية الاستهلاك", "ت.أ.ت.", "ت.خ.", "PAO", "Period After Opening", "الصلاحية بعد الفتح", "ف.ب.ف.", "SL", "Shelf Life", "مدة الصلاحية", "م.ص.", "EOSL", "End of Shelf Life", "نهاية العمر الافتراضي", "ن.ع."
+    "BB", "Best Before", "يفضل استهلاكه قبل", "ت.أ.", "BBD", "Best Before Date", "تاريخ أفضلية الاستهلاك", "ت.أ.ت.", "ت.خ.", "PAO", "Period After Opening", "الصلاحية بعد الفتح", "ف.ب.ف.", "SL", "Shelf Life", "مدة الصلاحية", "م.ص.", "EOSL", "End of Shelf Life", "نهاية العمر الافتراضي", "ن.ع.",
+    "تاريخ الإنتهاء", "تاريخ انتهاء"
   ];
 
   static const List<String> nameKeywords = [
     "product name", "name", "variety", "product", "item", "brand", "crop", "variety name", "trade name",
     "اسم المنتج", "المنتج", "الاسم", "صنف", "صنف :", "المادة", "نوع", "اسم الصنف", "ماركة", "المحصول", "اسم الصنف :", "الاسم التجاري", "اسم النوع", "المحصول :", "الصنف :", "product :",
-    "SKU", "وحدة حفظ المخزون", "و.ح.م."
+    "SKU", "وحدة حفظ المخزون", "و.ح.م.", "الصنف"
   ];
 
   static const List<String> sizeKeywords = [
@@ -32,7 +33,7 @@ class TextParser {
     "الحجم", "الوزن", "الكمية", "السعة", "صافي", "الوزن الصافي", "الوزن القائم", "وزن", "الوزن عند التعبئة",
     "الوزن الصافي عند التعبئة", "الكمية الصافية", "الوزن :", "بذور", "بذرة", "حبة", "السعة الصافية", "الوزن الاجمالي", "جرام", "كجم",
     "GW", "الوزن الإجمالي", "و.إ.", "NW", "الوزن الصافي", "و.ص.", "TW", "الوزن القائم للمغلف", "و.ف.", "CBM", "المتر المكعب", "م٣",
-    "MOQ", "الحد الأدنى للطلب", "ح.أ.ط.", "EOQ", "الكمية الاقتصادية للطلب", "ك.إ.ط.", "ROQ", "کمية إعادة الطلب"
+    "MOQ", "الحد الأدنى للطلب", "ح.أ.ط.", "EOQ", "الكمية الاقتصادية للطلب", "ك.إ.ط.", "ROQ", "کمية إعادة الطلب", "الوزن"
   ];
 
   static const Map<String, String> monthMap = {
@@ -50,6 +51,7 @@ class TextParser {
     RegExp(r'\b\d{2}\s*[./ \-]\s*\d{2}\s*[./ \-]\s*\d{2}\b'),      // DD/MM/YY
     RegExp(r'\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[. ]?\s*\d{4}\b', caseSensitive: false),
     RegExp(r'\b\d{1,2}[. ]?\s*(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[. ]?\s*\d{4}\b', caseSensitive: false),
+    RegExp(r'\b\d{4}/\d{1,2}\b'), // Added YYYY/M support for agricultural grids
   ];
 
   static final RegExp unitRegex = RegExp(
@@ -96,7 +98,8 @@ class TextParser {
       "exported", "imported", "company", "limited", "pvt", "india", "saudi", "variety", "kind", 
       "purity", "germination", "treatment", "crop", "product", "okra", "hybrid", "besf1", "green", "besf", "bes",
       "المحصول", "الصنف", "النوع", "الوزن", "المستورد", "المصدر", "هاتف", "فاكس", "المبيد",
-      "americi", "pvt.", "ltd.", "india", "hyderabad", "agriculture"
+      "americi", "pvt.", "ltd.", "india", "hyderabad", "agriculture",
+      "نقاوة", "إنبات", "تسجيل", "اللوط", "purity", "germination", "registration"
     ];
     return labels.any((l) => lower.contains(l.toLowerCase()));
   }

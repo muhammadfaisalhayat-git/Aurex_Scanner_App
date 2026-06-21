@@ -191,7 +191,10 @@ class NeuralPostProcessor {
   bool _isStrictKeywordMatch(String text, List<String> keywords) {
     for (var k in keywords) {
        final kw = k.toLowerCase();
-       if (text == kw || text.startsWith("$kw ") || text.startsWith("$kw:") || text.startsWith("$kw.")) return true;
+       // Robust word-boundary check + colon support for Arabic
+       if (text == kw || text == "$kw:" || text.startsWith("$kw ") || text.startsWith("$kw:") || text.startsWith("$kw.") || text.endsWith(" $kw") || text.endsWith(":$kw")) {
+         return true;
+       }
        if (text.contains("\n$kw") || text.contains("$kw\n")) return true;
     }
     return false;
