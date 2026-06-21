@@ -55,7 +55,9 @@ class _ResultScreenState extends State<ResultScreen> {
     p.warehouseName = _warehouseController.text;
 
     try {
-      await LearningService().learnLayout(p);
+      // Training Mode: Learn from this validated entry to improve next time
+      await LearningService().learnFromCorrection(p);
+
       await Provider.of<DatabaseService>(context, listen: false).insertProduct(p);
       await Provider.of<FirebaseService>(context, listen: false).backupAll([p]);
       
