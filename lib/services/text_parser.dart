@@ -7,14 +7,16 @@ class TextParser {
   static const List<String> mfgKeywords = [
     "production", "mfg", "mfd", "manufacture", "prod", "p:", "p .", "mfd date", "mfg date", "date of production", "production date", "packed", "packing date", "mfg. date", "mfd. date", "prod. date", "p. date", "test date",
     "انتاج", "تاريخ الانتاج", "تاريخ الإنتاج", "تاريخ الصنع", "تاريخ التصنيع", "تاريخ التعبئة", "تعبئة", "صنع", "DOM", "MFD", "test date", "تاريخ الفحص", "ت الفحص", "ت. فحص", "فحص",
-    "تاريخ التغليف", "فحص في", "manufactured", "prepared", "creation date", "date of mfg", "P.Date", "ت.انتاج", "ت.صنع", "batch date", "analysis date", "tested on", "test. date"
+    "تاريخ التغليف", "فحص في", "manufactured", "prepared", "creation date", "date of mfg", "P.Date", "ت.انتاج", "ت.صنع", "batch date", "analysis date", "tested on", "test. date",
+    "تاريخ الإنتاج", "تاريخ انتاج", "صنع في", "تعبئة في", "تاريخ التعبئة"
   ];
 
   // Agricultural expiry/validity keywords
   static const List<String> expKeywords = [
     "expiry", "exp", "ex:", "ex.", "expire", "best before", "e:", "e .", "expiry date", "exp date", "use by", "date of expiry", "date of expiration", "expiration date", "valid until", "valid till", "expier", "validity", "exp. date", "expiry. date", "expiry date", "e. date",
     "انتهاء", "تاريخ الانتهاء", "تاريخ الإنتهاء", "تاريخ النتهاء", "تاريخ انتهاء", "صلاحية", "DOE", "EXP", "يستخدم قبل", "ينتهي في", "صالح حتى", "تاريخ الصلاحية", "مدة الصلاحية", "تاريخ انتهاء الصلاحية",
-    "E.Date", "expires", "shelf life", "validity period", "best by", "consume before", "ت.انتهاء", "ت.صلاحية", "صالح لمدة", "يبقى صالحا", "تاريخ الاستهلاك", "حد اقصى", "استخدم قبل"
+    "E.Date", "expires", "shelf life", "validity period", "best by", "consume before", "ت.انتهاء", "ت.صلاحية", "صالح لمدة", "يبقى صالحا", "تاريخ الاستهلاك", "حد اقصى", "استخدم قبل",
+    "تاريخ الانتهاء", "تاريخ الصلاحية", "صالحة لمدة", "يستعمل قبل", "صلاحية لغاية", "تاريخ إنتهاء", "ينتهي بـ"
   ];
 
   static const List<String> nameKeywords = [
