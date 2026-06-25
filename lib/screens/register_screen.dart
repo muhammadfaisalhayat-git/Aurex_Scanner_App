@@ -40,7 +40,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // 1. Create User in Firebase Auth
       final UserCredential userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
@@ -49,12 +48,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
       final String uid = userCredential.user?.uid ?? "";
       final String email = _emailController.text.trim().toLowerCase();
       
-      // Admin and predefined VIP emails are auto-approved
       final bool isAdmin = email == "admin@aurex.com";
       final List<String> vipEmails = ["crby567@gmail.com", "admin@aurex.com"];
       final bool isApproved = isAdmin || vipEmails.contains(email);
 
-      // 2. Create User Profile in Realtime Database
       final Map<String, dynamic> userProfile = {
         'id': uid,
         'name': _nameController.text.trim(),
@@ -70,15 +67,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
       if (mounted) {
         setState(() => _isLoading = false);
-        
         if (isApproved) {
-          // Go to Login (User can now log in normally)
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text("Registration Successful! You can now log in."), backgroundColor: Colors.green),
           );
           Navigator.pop(context);
         } else {
-          // Show pending approval message
           _showApprovalDialog();
         }
       }
@@ -86,11 +80,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
       if (mounted) {
         setState(() => _isLoading = false);
         String message = "Registration Failed";
-        if (e.code == 'email-already-in-use') {
-          message = "This email is already registered.";
-        } else if (e.code == 'weak-password') {
-          message = "The password provided is too weak.";
-        }
+        if (e.code == 'email-already-in-use') message = "This email is already registered.";
+        else if (e.code == 'weak-password') message = "The password provided is too weak.";
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message), backgroundColor: Colors.red));
       }
     } catch (e) {
@@ -113,12 +104,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
             Text("Registration Sent"),
           ],
         ),
-        content: const Text("Your account has been created successfully but is pending administrator approval. Please wait for an admin to verify your access."),
+        content: const Text("Your account has been created successfully but is pending administrator approval."),
         actions: [
           TextButton(
             onPressed: () {
-              Navigator.pop(context); // Close dialog
-              Navigator.pop(context); // Go back to login
+              Navigator.pop(context);
+              Navigator.pop(context);
             },
             child: const Text("OK"),
           )
@@ -129,23 +120,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   Widget build(BuildContext context) {
-    const primaryGreen = Color(0xFF5EBA61);
-    final localeProvider = Provider.of<LocaleProvider>(context);
+    final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
-    final isAr = localeProvider.locale.languageCode == 'ar';
+    final isDark = theme.brightness == Brightness.dark;
+    final primary = theme.colorScheme.primary;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: theme.scaffoldBackgroundColor,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          icon: Icon(Icons.arrow_back, color: isDark ? Colors.white : Colors.black),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
           l10n.register,
-          style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+          style: TextStyle(color: isDark ? Colors.white : Colors.black, fontWeight: FontWeight.bold),
         ),
       ),
       body: SafeArea(
@@ -158,17 +149,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
               children: [
                 Text(
                   l10n.register,
-                  style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Color(0xFF333333)),
+                  style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: isDark ? Colors.white : const Color(0xFF333333)),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   l10n.tagline,
-                  style: const TextStyle(fontSize: 16, color: Colors.grey),
+                  style: TextStyle(fontSize: 16, color: isDark ? Colors.white54 : Colors.grey),
                 ),
                 const SizedBox(height: 40),
                 
-                // Name Field
                 _buildTextField(
+                  context,
                   controller: _nameController,
                   hint: l10n.fullName,
                   icon: Icons.person_outline,
@@ -176,8 +167,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 const SizedBox(height: 20),
 
-                // Email Field
                 _buildTextField(
+                  context,
                   controller: _emailController,
                   hint: l10n.email,
                   icon: Icons.email_outlined,
@@ -186,8 +177,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 const SizedBox(height: 20),
 
-                // Password Field
                 _buildTextField(
+                  context,
                   controller: _passwordController,
                   hint: l10n.password,
                   icon: Icons.lock_outline,
@@ -202,13 +193,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
                 Text(
                   l10n.warehouse,
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: primaryGreen),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: primary),
                 ),
                 const Divider(),
                 const SizedBox(height: 10),
 
-                // Warehouse Name
                 _buildTextField(
+                  context,
                   controller: _warehouseNameController,
                   hint: l10n.warehouse,
                   icon: Icons.warehouse_outlined,
@@ -216,8 +207,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 const SizedBox(height: 20),
 
-                // Warehouse Code
                 _buildTextField(
+                  context,
                   controller: _warehouseCodeController,
                   hint: l10n.productCode,
                   icon: Icons.qr_code_outlined,
@@ -225,14 +216,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 const SizedBox(height: 50),
 
-                // Register Button
                 SizedBox(
                   width: double.infinity,
                   height: 55,
                   child: ElevatedButton(
                     onPressed: _isLoading ? null : _register,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: primaryGreen,
+                      backgroundColor: primary,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       elevation: 4,
                     ),
@@ -253,7 +243,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
-  Widget _buildTextField({
+  Widget _buildTextField(
+    BuildContext context, {
     required TextEditingController controller,
     required String hint,
     required IconData icon,
@@ -262,25 +253,30 @@ class _RegisterScreenState extends State<RegisterScreen> {
     TextInputType? keyboardType,
     String? Function(String?)? validator,
   }) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final primary = theme.colorScheme.primary;
+
     return TextFormField(
       controller: controller,
       obscureText: obscureText,
       keyboardType: keyboardType,
-      style: const TextStyle(fontSize: 17),
+      style: TextStyle(fontSize: 17, color: isDark ? Colors.white : Colors.black),
       decoration: InputDecoration(
         hintText: hint,
-        prefixIcon: Icon(icon, color: const Color(0xFF5EBA61)),
+        hintStyle: TextStyle(color: isDark ? Colors.grey : Colors.grey.shade600),
+        prefixIcon: Icon(icon, color: primary),
         suffixIcon: suffixIcon,
         filled: true,
-        fillColor: Colors.grey.shade50,
+        fillColor: isDark ? Colors.grey.shade900 : Colors.grey.shade50,
         contentPadding: const EdgeInsets.symmetric(vertical: 18),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: Colors.grey.shade300),
+          borderSide: BorderSide(color: isDark ? Colors.grey.shade800 : Colors.grey.shade300),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: Color(0xFF5EBA61), width: 2),
+          borderSide: BorderSide(color: primary, width: 2),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
