@@ -37,8 +37,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _testSound() async {
     try {
       await _audioPlayer.stop(); // Ensure any previous play is stopped
-      await _audioPlayer.setSource(AssetSource('sounds/beep.wav'));
-      await _audioPlayer.play(AssetSource('sounds/beep.wav'), mode: PlayerMode.lowLatency);
+      await _audioPlayer.setSource(AssetSource('sounds/smart_scan.wav'));
+      await _audioPlayer.play(AssetSource('sounds/smart_scan.wav'), mode: PlayerMode.lowLatency);
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Playing test sound...")));
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Sound failed: $e"), backgroundColor: Colors.red));
