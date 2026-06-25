@@ -128,6 +128,17 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
 
         final barcodes = results[0] as List<Barcode>;
         final recognizedText = results[1] as RecognizedText;
+        
+        // Accurate Image Size for normalization
+        final Size baseSize = inputImage.metadata!.size;
+        final rotation = inputImage.metadata!.rotation;
+        
+        // Adjust size for portrait mode (swap width/height if 90/270 degree rotation)
+        final bool isPortrait = rotation == InputImageRotation.rotation90deg || rotation == InputImageRotation.rotation270deg;
+        final double imgW = isPortrait ? baseSize.height : baseSize.width;
+        final double imgH = isPortrait ? baseSize.width : baseSize.height;
+        final Size effectiveSize = Size(imgW, imgH);
+
         List<_HighlightBox> boxes = [];
         bool newlyDetected = false;
 
@@ -135,7 +146,9 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
            final code = barcodes.first.rawValue ?? "";
            _lastBarcode = code;
            if (!_beepedData.contains(code)) { newlyDetected = true; _beepedData.add(code); }
-           if (barcodes.first.boundingBox != null) boxes.add(_HighlightBox(barcodes.first.boundingBox!, Colors.blue));
+           if (barcodes.first.boundingBox != null) {
+              boxes.add(_HighlightBox(_normalizeRect(barcodes.first.boundingBox!, effectiveSize), Colors.blue));
+           }
         }
 
         final dateRegex = RegExp(r'\b\d{1,2}[./ \-]\d{2,4}\b');
@@ -146,7 +159,7 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
               final val = dateRegex.firstMatch(line.text)!.group(0)!;
               if (!_beepedData.contains(val)) { newlyDetected = true; _beepedData.add(val); }
               Color color = (blockText.contains("exp") || blockText.contains("انتهاء")) ? Colors.red : Colors.green;
-              boxes.add(_HighlightBox(line.boundingBox, color));
+              boxes.add(_HighlightBox(_normalizeRect(line.boundingBox, effectiveSize), color));
             }
           }
         }
@@ -154,13 +167,22 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
         if (mounted && boxes.isNotEmpty) {
           if (newlyDetected) unawaited(_playBeep());
           setState(() { _realtimeHighlights = boxes; });
-          Future.delayed(const Duration(milliseconds: 600), () {
+          Future.delayed(const Duration(milliseconds: 700), () {
             if (mounted) setState(() => _realtimeHighlights = []);
           });
         }
       } catch (_) {}
       _isAnalyzing = false;
     });
+  }
+
+  Rect _normalizeRect(Rect rawRect, Size imageSize) {
+    // Maps raw camera pixel coordinates to a 1000x1000 normalized space
+    double left = (rawRect.left / imageSize.width) * 1000.0;
+    double top = (rawRect.top / imageSize.height) * 1000.0;
+    double right = (rawRect.right / imageSize.width) * 1000.0;
+    double bottom = (rawRect.bottom / imageSize.height) * 1000.0;
+    return Rect.fromLTRB(left, top, right, bottom);
   }
 
   InputImage? _inputImageFromCameraImage(CameraImage image) {
@@ -237,10 +259,7 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
     setState(() => _isProcessing = true);
     
     try {
-      // Aggregate data from all captured images
       Product product = NeuralPostProcessor().refineMulti(_capturedTexts, _capturedSizes);
-      
-      // Apply spatial intelligence from all blocks
       for (var blocks in _capturedBlocks) {
         product = LearningService().applySpatialIntelligence(product, blocks);
       }
@@ -311,7 +330,6 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Clear Visual Counter for Captured Photos
                   if (_capturedPaths.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 20),
