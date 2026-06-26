@@ -158,7 +158,24 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
             if (dateRegex.hasMatch(line.text)) {
               final val = dateRegex.firstMatch(line.text)!.group(0)!;
               if (!_beepedData.contains(val)) { newlyDetected = true; _beepedData.add(val); }
-              Color color = (blockText.contains("exp") || blockText.contains("انتهاء")) ? Colors.red : Colors.green;
+              
+              // High-precision color assignment
+              Color color = Colors.green; // Default to Green (MFG)
+              
+              // If the text contains expiry keywords, strictly set to Red
+              final isExpiry = blockText.contains("exp") || 
+                              blockText.contains("expire") || 
+                              blockText.contains("valid") || 
+                              blockText.contains("تاريخ الانتهاء") ||
+                              blockText.contains("انتهاء") ||
+                              blockText.contains("صلاحية") ||
+                              blockText.contains("bb") ||
+                              blockText.contains("best before");
+              
+              if (isExpiry) {
+                color = Colors.red;
+              }
+
               boxes.add(_HighlightBox(_normalizeRect(line.boundingBox, effectiveSize), color));
             }
           }
