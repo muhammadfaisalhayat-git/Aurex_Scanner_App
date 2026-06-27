@@ -217,9 +217,31 @@ class FirebaseService {
   }
 
   Future<void> wipeDataFromServer() async {
-    debugPrint("Wipe: Deleting all user data and hierarchical images...");
-    await _productRef.remove();
-    // Note: We don't wipe the entire 'products' root because it might contain data for other users
-    // In a production app, we would list only the subfolders belonging to this user's products.
+    debugPrint("Wipe: Initiating systematic cloud cleanup...");
+    
+    try {
+      // 1. Fetch current product list to find all associated image folders
+      final snapshot = await _productRef.get().timeout(const Duration(seconds: 15));
+      if (snapshot.exists && snapshot.value is Map) {
+        final Map<dynamic, dynamic> data = snapshot.value as Map;
+        for (var key in data.keys) {
+          final String safeKey = key.toString();
+          // Delete product-specific image folder
+          try {
+            final folderRef = _baseStorageRef.child(safeKey);
+            final ListResult res = await folderRef.child("images").listAll();
+            for (var item in res.items) {
+               await item.delete();
+            }
+          } catch (_) {}
+        }
+      }
+
+      // 2. Remove RTDB records
+      await _productRef.remove();
+      debugPrint("Wipe: Cloud data and associated images cleared.");
+    } catch (e) {
+      debugPrint("Wipe error: $e");
+    }
   }
 }
