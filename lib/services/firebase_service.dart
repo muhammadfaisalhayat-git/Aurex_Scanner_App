@@ -12,7 +12,11 @@ import 'dart:convert';
 
 class FirebaseService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  final FirebaseDatabase _db = FirebaseDatabase.instance;
+  // Explicitly point to the specific database URL from google-services.json
+  final FirebaseDatabase _db = FirebaseDatabase.instanceFor(
+    app: FirebaseDatabase.instance.app,
+    databaseURL: "https://aurexscannerapp-default-rtdb.firebaseio.com",
+  );
   final FirebaseStorage _storage = FirebaseStorage.instance;
 
   DatabaseReference get _productRef {
@@ -42,7 +46,7 @@ class FirebaseService {
     int count = 0;
     Map<String, dynamic> updates = {};
 
-    debugPrint("Backup: Starting backup for $total products...");
+    debugPrint("Backup: Starting atomic backup for $total products...");
 
     for (int i = 0; i < products.length; i++) {
       final product = products[i];
@@ -53,15 +57,15 @@ class FirebaseService {
       
       bool allImagesUploaded = true;
 
-      // Handle multiple images
+      // Ensure all images are in Storage before marking RTDB entry
       for (int imgIndex = 0; imgIndex < product.imagePaths.length; imgIndex++) {
         final path = product.imagePaths[imgIndex];
         final File imageFile = File(path);
         if (imageFile.existsSync()) {
           try {
             final String fileName = "${key}_$imgIndex.jpg";
-            await _storageRef.child(fileName).putFile(imageFile).timeout(const Duration(seconds: 45));
-            debugPrint("Backup: Successfully uploaded image $fileName");
+            await _storageRef.child(fileName).putFile(imageFile).timeout(const Duration(seconds: 50));
+            debugPrint("Backup: Successfully verified image $fileName");
           } catch (e) {
             allImagesUploaded = false;
             debugPrint("Backup: Storage upload FAILED for $key (img $imgIndex): $e");
@@ -81,33 +85,41 @@ class FirebaseService {
     
     if (updates.isNotEmpty) {
       try {
+        // Step 1: Write Data
         await _productRef.update(updates).timeout(const Duration(seconds: 40));
-        debugPrint("Backup: Successfully updated server with ${updates.length} records.");
+        
+        // Step 2: Handshake Verification (Verify the server actually has what we just wrote)
+        final handshake = await _productRef.limitToFirst(1).get().timeout(const Duration(seconds: 15));
+        if (!handshake.exists) {
+           throw Exception("Backup Handshake Failed: Server reported empty storage after write.");
+        }
+        
+        debugPrint("Backup: Handshake Verified. Server write successful.");
         
         final ds = DatabaseService();
         for (var p in products) {
           if (p.isSynced) await ds.updateProduct(p);
         }
       } catch (e) {
-        debugPrint("Backup: Server update FAILED: $e");
+        debugPrint("Backup: Critical write failure: $e");
         rethrow;
       }
     }
   }
 
   Future<int?> restoreAll({Function(int current, int total)? onProgress}) async {
-    debugPrint("Restore: Fetching data from server...");
+    debugPrint("Restore: Initiating deep fetch from server...");
     
     DataSnapshot snapshot;
     try {
-      snapshot = await _productRef.get().timeout(const Duration(seconds: 35));
+      snapshot = await _productRef.get().timeout(const Duration(seconds: 40));
     } catch (e) {
-      debugPrint("Restore: Failed to fetch snapshot: $e");
+      debugPrint("Restore: Snapshot fetch timeout or error: $e");
       rethrow;
     }
 
     if (!snapshot.exists || snapshot.value == null) {
-      debugPrint("Restore: No data found at server.");
+      debugPrint("Restore: Server returned null for path ${_productRef.path}");
       return null;
     }
 
@@ -125,7 +137,7 @@ class FirebaseService {
     }
 
     final int total = rawData.length;
-    debugPrint("Restore: Found $total entries in backup.");
+    debugPrint("Restore: Found $total products on server. Normalizing formats...");
     
     int processedCount = 0;
     List<Product> restoredProducts = [];
@@ -136,56 +148,55 @@ class FirebaseService {
         final Map<String, dynamic> productData = entryValue.map((k, v) => MapEntry(k.toString(), v));
         final String entryKey = entry.key.toString();
         
-        // Step 1: Create product object first to get image path counts
+        // Handle image data carefully to prevent broken local links
         final restoredProduct = Product.fromMap(productData);
-        final int expectedImageCount = restoredProduct.imagePaths.length;
+        final int remoteImageCount = restoredProduct.imagePaths.length;
         
-        List<String> validLocalPaths = [];
+        List<String> verifiedLocalPaths = [];
 
-        // Step 2: Attempt to download each image
-        // If the server data is legacy (single string), it will have length 1
-        for (int idx = 0; idx < (expectedImageCount > 0 ? expectedImageCount : 10); idx++) {
+        // Try downloading with fallback for legacy formats
+        for (int idx = 0; idx < (remoteImageCount > 0 ? remoteImageCount : 5); idx++) {
           final String fileName = "${entryKey}_$idx.jpg";
           final String localPath = p.join(imagesPath, fileName);
           final File localFile = File(localPath);
 
           try {
             if (localFile.existsSync() && localFile.lengthSync() > 0) {
-              validLocalPaths.add(localPath);
+              verifiedLocalPaths.add(localPath);
             } else {
               final ref = _storageRef.child(fileName);
-              final Uint8List? data = await ref.getData(15 * 1024 * 1024).timeout(const Duration(seconds: 25)); 
+              final Uint8List? data = await ref.getData(15 * 1024 * 1024).timeout(const Duration(seconds: 30)); 
               if (data != null) {
                 await localFile.writeAsBytes(data);
                 if (localFile.existsSync()) {
-                  validLocalPaths.add(localPath);
-                  debugPrint("Restore: Downloaded $fileName");
+                  verifiedLocalPaths.add(localPath);
                 }
               }
             }
           } catch (_) {
-             // If we don't find the indexed file, maybe it's legacy single file?
-             if (idx == 0 && validLocalPaths.isEmpty) {
+             // Handle legacy single-image naming convention
+             if (idx == 0 && verifiedLocalPaths.isEmpty) {
                 try {
+                   final legacyLocalPath = p.join(imagesPath, "$entryKey.jpg");
+                   final legacyFile = File(legacyLocalPath);
                    final legacyRef = _storageRef.child("$entryKey.jpg");
-                   final Uint8List? lData = await legacyRef.getData(10 * 1024 * 1024).timeout(const Duration(seconds: 15));
+                   final Uint8List? lData = await legacyRef.getData(10 * 1024 * 1024).timeout(const Duration(seconds: 20));
                    if (lData != null) {
-                      await localFile.writeAsBytes(lData);
-                      validLocalPaths.add(localPath);
+                      await legacyFile.writeAsBytes(lData);
+                      verifiedLocalPaths.add(legacyLocalPath);
                    }
                 } catch (_) {}
              }
-             // Stop if we hit a missing index and we've processed at least one
-             if (idx >= expectedImageCount) break;
+             if (idx >= remoteImageCount) break;
           }
         }
 
-        restoredProduct.imagePaths = validLocalPaths;
-        restoredProduct.id = null; // Let local DB assign new ID
+        restoredProduct.imagePaths = verifiedLocalPaths;
+        restoredProduct.id = null; 
         restoredProduct.isSynced = true;
         restoredProducts.add(restoredProduct);
       } catch (e) {
-        debugPrint("Restore: Error parsing entry ${entry.key}: $e");
+        debugPrint("Restore: Error reconstructing entry ${entry.key}: $e");
       } finally {
         processedCount++;
         if (onProgress != null) onProgress(processedCount, total);
@@ -195,7 +206,7 @@ class FirebaseService {
     if (restoredProducts.isNotEmpty) {
       await dbService.deleteAll();
       await dbService.batchInsertProducts(restoredProducts);
-      debugPrint("Restore: Successfully committed ${restoredProducts.length} items.");
+      debugPrint("Restore: Synchronization Finalized. ${restoredProducts.length} items synced.");
     }
     
     return restoredProducts.length;

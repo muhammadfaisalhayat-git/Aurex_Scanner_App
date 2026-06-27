@@ -52,7 +52,7 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
   final _textRecognizer = TextRecognizer();
   final _barcodeScanner = BarcodeScanner();
   final _audioPlayer = AudioPlayer();
-  final _beepSource = AssetSource('sounds/shutter_v2.wav');
+  final _beepSource = AssetSource('sounds/aurex_shutter_final.wav');
   int _lastAnalysisTime = 0;
   final Set<String> _beepedData = {};
 

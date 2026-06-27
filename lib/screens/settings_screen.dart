@@ -37,8 +37,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _testSound() async {
     try {
       await _audioPlayer.stop(); // Ensure any previous play is stopped
-      await _audioPlayer.setSource(AssetSource('sounds/shutter_v2.wav'));
-      await _audioPlayer.play(AssetSource('sounds/shutter_v2.wav'), mode: PlayerMode.lowLatency);
+      await _audioPlayer.setSource(AssetSource('sounds/aurex_shutter_final.wav'));
+      await _audioPlayer.play(AssetSource('sounds/aurex_shutter_final.wav'), mode: PlayerMode.lowLatency);
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Playing camera shutter sound...")));
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Sound failed: $e"), backgroundColor: Colors.red));
