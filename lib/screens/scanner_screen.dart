@@ -52,7 +52,8 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
   final _textRecognizer = TextRecognizer();
   final _barcodeScanner = BarcodeScanner();
   final _audioPlayer = AudioPlayer();
-  final _beepSource = AssetSource('sounds/aurex_shutter_final.wav');
+  final _shutterSource = AssetSource('sounds/shutter_v5_final.wav');
+  final _pingSource = AssetSource('sounds/ping_v5_final.wav');
   int _lastAnalysisTime = 0;
   final Set<String> _beepedData = {};
 
@@ -67,13 +68,16 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
 
   Future<void> _setupAudio() async {
     try {
-      await _audioPlayer.setSource(_beepSource);
       await _audioPlayer.setPlayerMode(PlayerMode.lowLatency);
     } catch (_) {}
   }
 
-  Future<void> _playBeep() async {
-    try { await _audioPlayer.play(_beepSource, mode: PlayerMode.lowLatency); } catch (_) {}
+  Future<void> _playPing() async {
+    try { await _audioPlayer.play(_pingSource, mode: PlayerMode.lowLatency); } catch (_) {}
+  }
+
+  Future<void> _playShutter() async {
+    try { await _audioPlayer.play(_shutterSource, mode: PlayerMode.lowLatency); } catch (_) {}
   }
 
   Future<void> _initializeCamera() async {
@@ -182,7 +186,7 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
         }
 
         if (mounted && boxes.isNotEmpty) {
-          if (newlyDetected) unawaited(_playBeep());
+          if (newlyDetected) unawaited(_playPing());
           setState(() { _realtimeHighlights = boxes; });
           Future.delayed(const Duration(milliseconds: 700), () {
             if (mounted) setState(() => _realtimeHighlights = []);
@@ -231,7 +235,7 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
   Future<void> _capture() async {
     if (_controller == null || !_controller!.value.isInitialized || _isProcessing) return;
     
-    unawaited(_playBeep());
+    unawaited(_playShutter());
 
     try {
       final XFile rawImage = await _controller!.takePicture();
